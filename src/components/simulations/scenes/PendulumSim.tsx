@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { SimulationControls, type ControlConfig } from "../SimulationControls";
+import { Button } from "@/components/ui/button";
 
 const G = 9.81;
 
