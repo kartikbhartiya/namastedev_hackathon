@@ -1,12 +1,14 @@
 import { Suspense } from "react";
 import { Quizzes } from "@/screens/Quizzes";
 
-// Reading searchParams here in the Server Component avoids the useSearchParams() prerender bailout
-export default function QuizzesPage({
+// Next.js 15: searchParams is a Promise
+export default async function QuizzesPage({
   searchParams,
 }: {
-  searchParams: { action?: string; topic?: string };
+  searchParams: Promise<{ action?: string; topic?: string }>;
 }) {
+  const params = await searchParams;
+
   return (
     <Suspense
       fallback={
@@ -16,8 +18,8 @@ export default function QuizzesPage({
       }
     >
       <Quizzes
-        initialAction={searchParams.action ?? null}
-        initialTopic={searchParams.topic ?? null}
+        initialAction={params.action ?? null}
+        initialTopic={params.topic ?? null}
       />
     </Suspense>
   );
