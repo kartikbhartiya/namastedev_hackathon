@@ -134,17 +134,6 @@ export const trackAIRequest = (
   window.dispatchEvent(new CustomEvent('ai-usage-updated', {
     detail: { stats: newStats, history }
   }));
-
-  // Sync to database announcement
-  supabase.from('announcements').upsert({
-    id: 'a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1',
-    title: 'System AI Stats',
-    content: JSON.stringify({ stats: newStats, history }),
-    active: false,
-    created_at: new Date().toISOString()
-  }).then(({ error }) => {
-    if (error) console.error("Failed to sync AI stats:", error);
-  });
 };
 
 // Estimate tokens from text

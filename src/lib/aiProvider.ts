@@ -94,28 +94,8 @@ export async function loadProviderConfig(): Promise<AIProviderSettings> {
     // Check cache first
     if (configCache) return configCache;
 
-    // Try localStorage
-    const cached = localStorage.getItem(CONFIG_CACHE_KEY);
-    if (cached) {
-        try {
-            const config = JSON.parse(cached) as AIProviderSettings;
-            // Merge defaults in case new fields were added
-            const defaults = getDefaultConfig();
-            config.providerConfigs = {
-                ...defaults.providerConfigs,
-                ...config.providerConfigs
-            };
-            configCache = config;
-            return config;
-        } catch (e) {
-            console.error("Error reading cached provider config", e);
-        }
-    }
-
-    // Default configuration
-    const defaultConfig = getDefaultConfig();
-    configCache = defaultConfig;
-    return defaultConfig;
+    configCache = getDefaultConfig();
+    return configCache;
 }
 
 export function saveProviderConfig(config: AIProviderSettings) {

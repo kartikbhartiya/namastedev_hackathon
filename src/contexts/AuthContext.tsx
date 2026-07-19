@@ -16,9 +16,10 @@ interface UserProfile {
   role: string;
   study_streak: number;
   xp: number;
-  course: "jee" | "aktu";
+  course: string;
   earned_badge_ids: string[];
   has_seen_onboarding: boolean;
+  total_uptime?: number;
   college_name?: string;
   branch?: string;
   year?: string;
@@ -38,6 +39,7 @@ export interface AuthContextType {
   resetPassword: (email: string) => Promise<void>;
   refreshProfile: () => Promise<void>;
   updateUserStats: (stats: Partial<UserProfile>) => Promise<void>;
+  demoSignIn: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -189,6 +191,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const demoSignIn = async () => {
+    setLoading(true);
+    // Force a mock user state so judges can bypass authentication instantly
+    setUser({ id: "demo-judge", email: "judge@orbit.com" });
+    setSession({ user: { id: "demo-judge" } });
+    setProfile({
+      id: "demo-judge",
+      email: "judge@orbit.com",
+      name: "Hackathon Judge",
+      photo_url: "https://api.dicebear.com/7.x/bottts/svg?seed=OrbitJudge",
+      role: "user",
+      study_streak: 8,
+      xp: 1280,
+      course: "btech",
+      earned_badge_ids: ["quiz-master", "stack-tracer", "interview-pro"],
+      has_seen_onboarding: true,
+      total_uptime: 745,
+      college_name: "AKTU University",
+      branch: "Computer Science",
+      year: "3rd Year"
+    });
+    setAuthState("AUTHENTICATED_READY");
+    setLoading(false);
+    toast.success("Demo Mode Activated!");
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -204,7 +232,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         logout: handleLogout,
         resetPassword: handleResetPassword,
         refreshProfile,
-        updateUserStats
+        updateUserStats,
+        demoSignIn
       }}
     >
       {children}

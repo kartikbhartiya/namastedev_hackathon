@@ -238,6 +238,43 @@ export function AITutor() {
 
         const loadData = async () => {
             try {
+                if (user.id === "demo-judge") {
+                    setTutorProfile({
+                        user_id: "demo-judge",
+                        tutor_name: "Orbit AI Coach",
+                        tone: "supportive",
+                        motivation_style: "direct",
+                        learning_pace: "normal",
+                        explanation_style: "conceptual",
+                        interests: ["CS", "Coding"],
+                        learning_challenges: ["Singly Linked Lists"],
+                        education_domain: "Engineering",
+                        target_exam: "BTech Exams"
+                    });
+                    const mockSessions = [
+                        {
+                            id: "demo-session-1",
+                            user_id: "demo-judge",
+                            title: "Singly LinkedList Stack Tracing",
+                            mode: "text",
+                            updated_at: new Date().toISOString(),
+                            created_at: new Date().toISOString()
+                        }
+                    ];
+                    setSessions(mockSessions);
+                    setActiveSessionId("demo-session-1");
+                    setMessages([
+                        {
+                            id: "m1",
+                            role: "assistant",
+                            content: "Hello! I am your visual algorithm stack tracing tutor. Let's walk through Singly LinkedLists stack operations. What algorithm would you like to trace first?"
+                        }
+                    ]);
+                    setMode("text");
+                    setLoading(false);
+                    return;
+                }
+
                 const tp = await db.tutorProfiles.get(user.id);
                 if (!tp) {
                     router.push("/ai-tutor/setup");
