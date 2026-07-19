@@ -43,7 +43,7 @@ function MetricSparkline() {
 // Quiet, elegant metric card
 function MetricWidget({ label, value, trend, icon: Icon }: any) {
   return (
-    <div className="w-[180px] p-[24px] rounded-xl bg-[#0b0b0b] border border-white/5 flex flex-col justify-between select-none">
+    <div className="w-full sm:w-[180px] p-4 sm:p-[24px] rounded-xl bg-[#0b0b0b] border border-white/5 flex flex-col justify-between select-none">
       <div className="flex justify-between items-center text-[#707070] mb-3">
         <span className="text-[11px] font-semibold uppercase tracking-wider">{label}</span>
         <Icon className="h-4 w-4" />
@@ -172,7 +172,7 @@ export default function Dashboard() {
   const activeCourseLabel = profile?.course ? profile.course.toUpperCase() : "BTECH";
 
   return (
-    <div className="w-full max-w-5xl mx-auto space-y-24 pt-32 pb-16 vignette-bg select-none">
+    <div className="w-full max-w-5xl mx-auto space-y-12 sm:space-y-24 pt-20 sm:pt-32 pb-10 sm:pb-16 px-4 sm:px-6 vignette-bg select-none">
       
       {/* 1. HERO SPLIT SECTION - High contrast & catchy */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-10 items-stretch">
@@ -188,7 +188,7 @@ export default function Dashboard() {
             </span>
           </div>
           
-          <h1 className="text-[38px] font-extrabold tracking-tight text-white leading-tight">
+          <h1 className="text-[24px] sm:text-[38px] font-extrabold tracking-tight text-white leading-tight">
             An intelligent operating workspace for computer science.
           </h1>
           <p className="text-[14px] text-neutral-400 max-w-lg leading-relaxed">
@@ -309,7 +309,7 @@ export default function Dashboard() {
         <span className="text-[11px] font-bold uppercase tracking-widest text-[#707070] block">
           Progress Overview
         </span>
-        <div className="flex flex-wrap gap-6">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-4 sm:gap-6">
           <MetricWidget label="Streak" value={`${profile?.study_streak || 0} days`} trend="Active Streak" icon={Flame} />
           <MetricWidget label="Orbit XP" value={`${profile?.xp || 0}`} trend="Accumulated" icon={Trophy} />
           <MetricWidget label="Achievements" value={`${profile?.earned_badge_ids?.length || 0} unlocked`} trend="Milestones" icon={Award} />
@@ -318,7 +318,7 @@ export default function Dashboard() {
       </section>
 
       {/* 5. MODULAR SECTIONS */}
-      <section className="space-y-24">
+      <section className="space-y-12 sm:space-y-24">
         
         {/* LEARN */}
         <div className="space-y-4">
