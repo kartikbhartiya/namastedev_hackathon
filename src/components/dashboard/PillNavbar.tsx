@@ -63,7 +63,7 @@ export function PillNavbar({ avatarUrl, avatarFallback }: PillNavbarProps) {
         <div className="w-[1px] h-6 bg-white/10 shrink-0" />
 
         {/* Middle Navigation Group */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 overflow-x-auto max-w-[calc(100vw-140px)] md:max-w-none no-scrollbar">
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
@@ -72,17 +72,17 @@ export function PillNavbar({ avatarUrl, avatarFallback }: PillNavbarProps) {
               <button
                 key={item.id}
                 onClick={() => router.push(item.href)}
-                className="relative p-2.5 rounded-full text-neutral-400 hover:text-white hover:bg-white/5 transition-all duration-150 group flex flex-col items-center hover:scale-105 shrink-0 focus:outline-none"
+                className="relative p-2 rounded-full text-neutral-400 hover:text-white hover:bg-white/5 transition-all duration-150 group flex flex-col items-center hover:scale-105 shrink-0 focus:outline-none"
               >
-                <Icon className={cn("h-[20px] w-[20px] transition-transform duration-150", isActive && "text-[#ff6c37]")} />
+                <Icon className={cn("h-4 w-4 md:h-5 md:w-5 transition-transform duration-150", isActive && "text-[#ff6c37]")} />
                 
                 {/* Active Indicator underneath */}
                 {isActive && (
-                  <span className="absolute bottom-1 w-1 h-1 rounded-full bg-[#ff6c37] shadow-[0_0_10px_#ff6c37]" />
+                  <span className="absolute bottom-0.5 w-1 h-1 rounded-full bg-[#ff6c37] shadow-[0_0_10px_#ff6c37]" />
                 )}
 
-                {/* Tooltip Label */}
-                <span className="absolute bottom-[-45px] left-1/2 -translate-x-1/2 bg-neutral-950 border border-white/5 text-[10px] font-bold text-white px-2.5 py-1 rounded-md opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap shadow-2xl tracking-wider">
+                {/* Tooltip Label - Hide on touch devices / mobile */}
+                <span className="hidden md:block absolute bottom-[-45px] left-1/2 -translate-x-1/2 bg-neutral-950 border border-white/5 text-[10px] font-bold text-white px-2.5 py-1 rounded-md opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap shadow-2xl tracking-wider">
                   {item.label.toUpperCase()}
                 </span>
               </button>
