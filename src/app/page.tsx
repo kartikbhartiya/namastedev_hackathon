@@ -172,7 +172,7 @@ export default function Dashboard() {
   const activeCourseLabel = profile?.course ? profile.course.toUpperCase() : "BTECH";
 
   return (
-    <div className="w-full max-w-5xl mx-auto space-y-24 pt-32 pb-16 vignette-bg select-none">
+    <div className="w-full max-w-5xl mx-auto space-y-24 pt-32 px-6 pb-16 vignette-bg select-none">
       
       {/* 1. HERO SPLIT SECTION - High contrast & catchy */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-10 items-stretch">

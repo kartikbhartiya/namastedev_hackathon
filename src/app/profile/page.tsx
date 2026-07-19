@@ -7,7 +7,7 @@ export default function ProfileSettingsPage() {
   const { user, profile } = useAuth();
 
   return (
-    <div className="max-w-2xl mx-auto space-y-12 py-10 select-none">
+    <div className="max-w-2xl mx-auto space-y-12 pt-32 px-6 pb-16 select-none">
       {/* Page Header */}
       <div>
         <span className="text-[13px] font-semibold uppercase tracking-widest text-[#707070] mb-2 block">
