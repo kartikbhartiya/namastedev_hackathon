@@ -133,21 +133,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       if (error) throw error;
       
-      // Create user profile in mock / real db
-      const profileInfo: UserProfile = {
-        id: data.user.id,
-        email: data.user.email,
-        name: name || email.split("@")[0],
-        photo_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${email}`,
-        role: "user",
-        study_streak: 1,
-        xp: 10,
-        course: "btech",
-        earned_badge_ids: [],
-        has_seen_onboarding: false
-      };
-      
-      await supabase.from("users").insert(profileInfo);
+      // data.user can be null if email confirmation is required
+      if (data.user) {
+        const profileInfo: UserProfile = {
+          id: data.user.id,
+          email: data.user.email ?? null,
+          name: name || email.split("@")[0],
+          photo_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${email}`,
+          role: "user",
+          study_streak: 1,
+          xp: 10,
+          course: "btech",
+          earned_badge_ids: [],
+          has_seen_onboarding: false
+        };
+        await supabase.from("users").insert(profileInfo);
+      }
       
       toast.success("Account created successfully!");
       await refreshProfile();
