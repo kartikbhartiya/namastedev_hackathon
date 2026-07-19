@@ -734,15 +734,15 @@ export function Quizzes() {
   return (
     <div className={cn("min-h-screen transition-all duration-500 pt-14 md:pt-16 bg-[#020617] text-slate-50")}>
       <header className={cn("sticky top-14 md:top-16 z-50 border-b backdrop-blur-md bg-background/40 border-white/5 shadow-sm")}>
-        <div className="container mx-auto px-6 py-4 flex justify-between items-center">
+        <div className="container mx-auto px-3 sm:px-6 py-3 sm:py-4 flex justify-between items-center">
           <div className="flex items-center gap-3 group cursor-pointer" onClick={() => router.push("/")}>
             <div className={cn("p-2.5 rounded-xl transition-all duration-300 group-hover:rotate-12 bg-white/5 text-white")}>
               <Brain className="h-5 w-5" />
             </div>
-            <span className="text-xl font-bold tracking-tight text-white">Quizzes</span>
+            <span className="text-lg sm:text-xl font-bold tracking-tight text-white">Quizzes</span>
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="ghost" onClick={() => router.push("/")} className="rounded-xl gap-1.5 hover:bg-white/5 text-neutral-300">
+            <Button variant="ghost" onClick={() => router.push("/")} className="rounded-xl gap-1.5 hover:bg-white/5 text-neutral-300 text-xs sm:text-sm px-2 sm:px-3">
               <LayoutDashboard className="h-4 w-4" /> Dashboard
             </Button>
             <ThemeToggle />
@@ -750,7 +750,7 @@ export function Quizzes() {
         </div>
       </header>
 
-      <main className="container mx-auto px-6 py-8 space-y-6 relative z-10 max-w-5xl">
+      <main className="container mx-auto px-3 sm:px-6 py-5 sm:py-8 space-y-4 sm:space-y-6 relative z-10 max-w-5xl">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
             { icon: Brain, label: "Available Assessments", value: quizzes.length, color: "from-neutral-800 to-neutral-900 border border-border" },
