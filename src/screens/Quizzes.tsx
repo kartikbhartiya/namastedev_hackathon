@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useMemo } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -63,11 +63,10 @@ interface QuizAttempt {
   completedAt: any;
 }
 
-export function Quizzes() {
+export function Quizzes({ initialAction, initialTopic }: { initialAction?: string | null; initialTopic?: string | null }) {
   const { user, profile } = useAuth();
   const { theme } = useTheme();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const isDark = theme === "dark";
 
   // Data State
@@ -152,14 +151,13 @@ export function Quizzes() {
   }, [user]);
 
   useEffect(() => {
-    if (searchParams.get('action') === 'generate') {
-      const topic = searchParams.get('topic');
-      if (topic) {
-        setAiTopic(decodeURIComponent(topic));
+    if (initialAction === 'generate') {
+      if (initialTopic) {
+        setAiTopic(decodeURIComponent(initialTopic));
       }
       setIsAiDialogOpen(true);
     }
-  }, [searchParams]);
+  }, [initialAction, initialTopic]);
 
   // Timer Effect
   useEffect(() => {
