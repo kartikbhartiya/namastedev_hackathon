@@ -450,99 +450,105 @@ export function Quizzes() {
               <CardTitle className="text-xl font-bold leading-relaxed">{currentQuestion?.question}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {currentQuestion?.options.map((option, i) => {
-                const isSelected = selectedAnswers[currentQuestionIndex] === i;
+              {(() => {
                 const isPracticeMode = activeQuiz.mode === 'practice' || !activeQuiz.mode;
                 const hasAnswered = selectedAnswers[currentQuestionIndex] !== null;
-                const isCorrect = i === currentQuestion.correctIndex;
-
-                let btnStyle = "bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.05] text-neutral-300";
-                let iconStyle = "bg-white/10 text-white";
-
-                if (isSelected) {
-                  btnStyle = "bg-white text-black border-white shadow-lg";
-                  iconStyle = "bg-black/20 text-black";
-                }
-
-                if (isPracticeMode && hasAnswered) {
-                  if (isCorrect) {
-                    btnStyle = "bg-green-500/10 border-green-500/30 text-green-400";
-                    iconStyle = "bg-green-500 text-white";
-                  } else if (isSelected && !isCorrect) {
-                    btnStyle = "bg-rose-500/10 border-rose-500/30 text-rose-400 opacity-80";
-                    iconStyle = "bg-rose-500 text-white";
-                  } else {
-                    btnStyle = "opacity-40 grayscale cursor-not-allowed hidden md:flex";
-                  }
-                }
-
                 return (
-                  <button
-                    key={i}
-                    onClick={() => selectAnswer(i)}
-                    disabled={isPracticeMode && hasAnswered}
-                    className={cn(
-                      "w-full p-4 rounded-xl text-left transition-all duration-200 border text-sm font-medium flex items-center gap-3",
-                      btnStyle
-                    )}
-                  >
-                    <span className={cn(
-                      "w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shrink-0",
-                      iconStyle
-                    )}>
-                      {String.fromCharCode(65 + i)}
-                    </span>
-                    <span className="flex-1">{option}</span>
-                    {isPracticeMode && hasAnswered && isCorrect && <CheckCircle2 className="h-4 w-4 ml-auto text-green-400 shrink-0" />}
-                    {isPracticeMode && hasAnswered && isSelected && !isCorrect && <XCircle className="h-4 w-4 ml-auto text-rose-400 shrink-0" />}
-                  </button>
-                );
-              })}
+                  <>
+                    {currentQuestion?.options.map((option, i) => {
+                      const isSelected = selectedAnswers[currentQuestionIndex] === i;
+                      const isCorrect = i === currentQuestion.correctIndex;
 
-              {isPracticeMode && hasAnswered && currentQuestion?.explanation && (
-                <div className="mt-4 p-5 rounded-xl bg-white/[0.01] border border-white/[0.06] animate-in fade-in duration-300">
-                  <h4 className="font-bold text-neutral-300 text-xs mb-1.5 flex items-center gap-1.5 uppercase tracking-wider">
-                    <Sparkles className="h-3.5 w-3.5 text-neutral-400" /> Explanation
-                  </h4>
-                  <p className="text-xs text-neutral-400 leading-relaxed mb-3">
-                    {currentQuestion.explanation}
-                  </p>
+                      let btnStyle = "bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.05] text-neutral-300";
+                      let iconStyle = "bg-white/10 text-white";
 
-                  {currentQuestion.incorrectReasoning && currentQuestion.incorrectReasoning.length > 0 && selectedAnswers[currentQuestionIndex] !== currentQuestion.correctIndex && (
-                    <div className="space-y-2 pt-3 border-t border-white/[0.06]">
-                      <h5 className="font-semibold text-[10px] text-neutral-500 uppercase tracking-wider">Incorrect Option Analysis</h5>
-                      {currentQuestion.options.map((opt, idx) => {
-                        if (idx === currentQuestion.correctIndex) return null;
-                        const reasoning = currentQuestion.incorrectReasoning?.[idx];
-                        if (!reasoning) return null;
+                      if (isSelected) {
+                        btnStyle = "bg-white text-black border-white shadow-lg";
+                        iconStyle = "bg-black/20 text-black";
+                      }
 
-                        return (
-                          <div key={idx} className="flex gap-2 text-xs text-neutral-400 bg-white/[0.02] p-2.5 rounded-lg border border-white/[0.04]">
-                            <span className="font-bold text-neutral-500">{String.fromCharCode(65 + idx)}:</span>
-                            <p className="leading-normal">{reasoning}</p>
-                          </div>
-                        );
-                      })}
+                      if (isPracticeMode && hasAnswered) {
+                        if (isCorrect) {
+                          btnStyle = "bg-green-500/10 border-green-500/30 text-green-400";
+                          iconStyle = "bg-green-500 text-white";
+                        } else if (isSelected && !isCorrect) {
+                          btnStyle = "bg-rose-500/10 border-rose-500/30 text-rose-400 opacity-80";
+                          iconStyle = "bg-rose-500 text-white";
+                        } else {
+                          btnStyle = "opacity-40 grayscale cursor-not-allowed hidden md:flex";
+                        }
+                      }
 
-                      <div className="pt-3 flex justify-end">
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className="rounded-lg font-bold text-xs bg-white/[0.05] hover:bg-white/[0.1] text-white border border-white/10"
-                          onClick={() => handleGenerateFollowUp(currentQuestion.question)}
-                          disabled={isGeneratingFollowUp}
-                        >
-                          {isGeneratingFollowUp ? (
-                            <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Adding Questions...</>
-                          ) : (
-                            <><Brain className="h-3.5 w-3.5 mr-1.5" /> Request Follow-up Concepts</>
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => selectAnswer(i)}
+                          disabled={isPracticeMode && hasAnswered}
+                          className={cn(
+                            "w-full p-4 rounded-xl text-left transition-all duration-200 border text-sm font-medium flex items-center gap-3",
+                            btnStyle
                           )}
-                        </Button>
+                        >
+                          <span className={cn(
+                            "w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shrink-0",
+                            iconStyle
+                          )}>
+                            {String.fromCharCode(65 + i)}
+                          </span>
+                          <span className="flex-1">{option}</span>
+                          {isPracticeMode && hasAnswered && isCorrect && <CheckCircle2 className="h-4 w-4 ml-auto text-green-400 shrink-0" />}
+                          {isPracticeMode && hasAnswered && isSelected && !isCorrect && <XCircle className="h-4 w-4 ml-auto text-rose-400 shrink-0" />}
+                        </button>
+                      );
+                    })}
+
+                    {isPracticeMode && hasAnswered && currentQuestion?.explanation && (
+                      <div className="mt-4 p-5 rounded-xl bg-white/[0.01] border border-white/[0.06] animate-in fade-in duration-300">
+                        <h4 className="font-bold text-neutral-300 text-xs mb-1.5 flex items-center gap-1.5 uppercase tracking-wider">
+                          <Sparkles className="h-3.5 w-3.5 text-neutral-400" /> Explanation
+                        </h4>
+                        <p className="text-xs text-neutral-400 leading-relaxed mb-3">
+                          {currentQuestion.explanation}
+                        </p>
+
+                        {currentQuestion.incorrectReasoning && currentQuestion.incorrectReasoning.length > 0 && selectedAnswers[currentQuestionIndex] !== currentQuestion.correctIndex && (
+                          <div className="space-y-2 pt-3 border-t border-white/[0.06]">
+                            <h5 className="font-semibold text-[10px] text-neutral-500 uppercase tracking-wider">Incorrect Option Analysis</h5>
+                            {currentQuestion.options.map((opt, idx) => {
+                              if (idx === currentQuestion.correctIndex) return null;
+                              const reasoning = currentQuestion.incorrectReasoning?.[idx];
+                              if (!reasoning) return null;
+
+                              return (
+                                <div key={idx} className="flex gap-2 text-xs text-neutral-400 bg-white/[0.02] p-2.5 rounded-lg border border-white/[0.04]">
+                                  <span className="font-bold text-neutral-500">{String.fromCharCode(65 + idx)}:</span>
+                                  <p className="leading-normal">{reasoning}</p>
+                                </div>
+                              );
+                            })}
+
+                            <div className="pt-3 flex justify-end">
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                className="rounded-lg font-bold text-xs bg-white/[0.05] hover:bg-white/[0.1] text-white border border-white/10"
+                                onClick={() => handleGenerateFollowUp(currentQuestion.question)}
+                                disabled={isGeneratingFollowUp}
+                              >
+                                {isGeneratingFollowUp ? (
+                                  <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Adding Questions...</>
+                                ) : (
+                                  <><Brain className="h-3.5 w-3.5 mr-1.5" /> Request Follow-up Concepts</>
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  )}
-                </div>
-              )}
+                    )}
+                  </>
+                );
+              })()}
             </CardContent>
           </Card>
 
