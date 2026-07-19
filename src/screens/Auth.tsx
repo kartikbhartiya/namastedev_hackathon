@@ -75,7 +75,7 @@ const Auth = () => {
       if (profile.role === 'admin' || profile.role === 'super_admin') {
         router.replace("/admin");
       } else {
-        router.replace("/dashboard");
+        router.replace("/");
       }
     }
   }, [user, profile, authLoading, router]);

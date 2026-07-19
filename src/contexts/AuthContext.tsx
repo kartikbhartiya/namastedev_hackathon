@@ -142,7 +142,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role: "user",
         study_streak: 1,
         xp: 10,
-        course: "aktu",
+        course: "btech",
         earned_badge_ids: [],
         has_seen_onboarding: false
       };
