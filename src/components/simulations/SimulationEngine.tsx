@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense } from "react";
+import React, { useState, lazy, Suspense } from "react";
 import { cn } from "@/lib/utils";
 import { SIMULATION_REGISTRY, getSimulationsByDomain, type SimulationEntry, type SimulationDomain } from "./SimulationRegistry";
 import { Info, Atom, Calculator, Code2, Lightbulb } from "lucide-react";
@@ -12,7 +12,7 @@ const SortingAlgoSim = lazy(() => import("./scenes/SortingAlgoSim").then(m => ({
 const GraphPlotterSim = lazy(() => import("./scenes/GraphPlotterSim").then(m => ({ default: m.GraphPlotterSim })));
 const PendulumSim = lazy(() => import("./scenes/PendulumSim").then(m => ({ default: m.PendulumSim })));
 
-const SIM_COMPONENTS: Record<string, React.LazyExoticComponent<() => JSX.Element>> = {
+const SIM_COMPONENTS: Record<string, React.LazyExoticComponent<() => React.JSX.Element>> = {
     gauss_law: GaussLawSim,
     wave_interference: WaveInterferenceSim,
     projectile_motion: ProjectileMotionSim,
