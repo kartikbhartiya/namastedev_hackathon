@@ -804,6 +804,8 @@ export default function InterviewMode() {
             onHome={() => router.push("/")}
             onClaimXP={handleClaimXP}
             xpClaimed={xpClaimed}
+            violations={violations}
+            questionMetas={questionMetas}
           />
         </main>
       </div>

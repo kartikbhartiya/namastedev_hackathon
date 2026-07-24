@@ -1,8 +1,8 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { InterviewScoreBreakdown, InterviewConfig, ROLE_OPTIONS } from "@/lib/aiInterview";
-import { Award, AlertTriangle, TrendingUp, RotateCcw, Home, Sparkles, CheckCircle2, XCircle, Printer } from "lucide-react";
+import { InterviewScoreBreakdown, InterviewConfig, ROLE_OPTIONS, ProctoringViolation, QuestionMeta } from "@/lib/aiInterview";
+import { Award, AlertTriangle, TrendingUp, RotateCcw, Home, Sparkles, CheckCircle2, XCircle, Printer, Star, Shield } from "lucide-react";
 
 interface InterviewScorecardProps {
   score: InterviewScoreBreakdown;
@@ -11,6 +11,8 @@ interface InterviewScorecardProps {
   onHome: () => void;
   onClaimXP?: () => void;
   xpClaimed?: boolean;
+  violations?: ProctoringViolation[];
+  questionMetas?: QuestionMeta[];
 }
 
 function ScoreRing({ value, max, label, color }: { value: number; max: number; label: string; color: string }) {
@@ -127,7 +129,143 @@ function GradeDisplay({ grade, recommendation }: { grade: string; recommendation
   );
 }
 
-export function InterviewScorecard({ score, config, onRetry, onHome, onClaimXP, xpClaimed }: InterviewScorecardProps) {
+function IntegrityLog({ violations = [] }: { violations?: ProctoringViolation[] }) {
+  const score = Math.max(0, 100 - violations.length * 20);
+  const color = score >= 80 ? "stroke-emerald-400" : score >= 50 ? "stroke-amber-400" : "stroke-red-400";
+  const textColor = score >= 80 ? "text-emerald-400" : score >= 50 ? "text-amber-400" : "text-red-400";
+  const bgBadge = score >= 80 ? "bg-emerald-500/10 border-emerald-500/20" : score >= 50 ? "bg-amber-500/10 border-amber-500/20" : "bg-red-500/10 border-red-500/20";
+
+  return (
+    <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/10 space-y-4">
+      <div className="flex items-center justify-between border-b border-white/5 pb-2">
+        <span className="text-xs font-bold uppercase tracking-widest text-neutral-400 flex items-center gap-1.5">
+          <Shield className="w-4 h-4 text-red-400" /> Integrity & Security Audit
+        </span>
+        <span className={cn("text-[10px] font-bold px-2.5 py-1 rounded-full border uppercase tracking-wider", bgBadge, textColor)}>
+          Score: {score}%
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-center pt-2">
+        {/* Integrity Gauge */}
+        <div className="flex justify-center md:col-span-1">
+          <div className="relative w-20 h-20">
+            <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
+              <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="5" />
+              <circle
+                cx="40" cy="40" r="34" fill="none"
+                stroke={score >= 80 ? "#10b981" : score >= 50 ? "#f59e0b" : "#ef4444"}
+                strokeWidth="5"
+                strokeDasharray={2 * Math.PI * 34}
+                strokeDashoffset={2 * Math.PI * 34 * (1 - score / 100)}
+                className="transition-all duration-1000 ease-out"
+              />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-lg font-black text-white">{score}%</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Violations Timeline */}
+        <div className="md:col-span-3 space-y-2">
+          {violations.length === 0 ? (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10 text-emerald-400 text-xs">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>Perfect Integrity Record. No violations detected during proctoring session.</span>
+            </div>
+          ) : (
+            <div className="space-y-1.5 max-h-32 overflow-y-auto custom-scrollbar pr-1">
+              {violations.map((v, i) => {
+                const labelMap: Record<string, string> = {
+                  "tab-switch": "Tab Switch Flagged",
+                  "fullscreen-exit": "Exited Fullscreen Lock",
+                  "copy-paste": "Blocked Clipboard Copy/Paste",
+                };
+                return (
+                  <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-red-500/5 border border-red-500/10 text-neutral-300 text-xs">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                      <span>{labelMap[v.type] || v.type}</span>
+                    </div>
+                    <span className="text-[10px] text-neutral-500 font-mono">
+                      {new Date(v.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PerformanceTimeline({ questionMetas }: { questionMetas?: QuestionMeta[] }) {
+  if (!questionMetas || questionMetas.length === 0) return null;
+
+  return (
+    <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/10 space-y-4">
+      <span className="text-xs font-bold uppercase tracking-widest text-neutral-400 block border-b border-white/5 pb-2">Question Pacing & Confidence Timeline</span>
+      <div className="space-y-4">
+        {questionMetas.map((q) => {
+          const duration = q.answeredAt ? Math.round((q.answeredAt - q.startedAt) / 1000) : null;
+          const formatDuration = (sec: number) => {
+            if (sec < 60) return `${sec}s`;
+            const m = Math.floor(sec / 60);
+            const s = sec % 60;
+            return `${m}m ${s}s`;
+          };
+
+          return (
+            <div key={q.number} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl bg-white/[0.01] border border-white/5 gap-3 hover:bg-white/[0.02] transition-all">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-neutral-800 flex items-center justify-center font-bold text-xs text-white border border-white/5">
+                  Q{q.number}
+                </div>
+                <div className="text-left">
+                  <span className="text-sm font-bold text-white block capitalize">{q.topic || "General Discussion"}</span>
+                  <span className="text-[10px] text-neutral-500 font-semibold uppercase tracking-wider">{q.type} Round</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-6">
+                {/* Answer Duration */}
+                {duration !== null && (
+                  <div className="text-right">
+                    <span className="text-[10px] text-neutral-500 block uppercase tracking-wider">Answer Pace</span>
+                    <span className="text-xs font-mono font-bold text-neutral-300">{formatDuration(duration)}</span>
+                  </div>
+                )}
+
+                {/* Self-Rating */}
+                {q.confidenceRating !== undefined && (
+                  <div className="text-right">
+                    <span className="text-[10px] text-neutral-500 block uppercase tracking-wider">Self-Confidence</span>
+                    <div className="flex items-center gap-0.5 justify-end">
+                      {Array.from({ length: 5 }).map((_, idx) => (
+                        <Star
+                          key={idx}
+                          className={cn(
+                            "w-3 h-3",
+                            idx < q.confidenceRating! ? "text-amber-400 fill-amber-400" : "text-neutral-700"
+                          )}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export function InterviewScorecard({ score, config, onRetry, onHome, onClaimXP, xpClaimed, violations = [], questionMetas = [] }: InterviewScorecardProps) {
   const roleInfo = ROLE_OPTIONS.find(r => r.value === config.role);
 
   return (
@@ -174,6 +312,11 @@ export function InterviewScorecard({ score, config, onRetry, onHome, onClaimXP, 
         </div>
       </div>
 
+      {/* Proctoring Integrity & Security Log */}
+      {config.enableProctoring && (
+        <IntegrityLog violations={violations} />
+      )}
+
       {/* Strengths & Red Flags */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="p-6 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 space-y-3">
@@ -206,6 +349,9 @@ export function InterviewScorecard({ score, config, onRetry, onHome, onClaimXP, 
           </ul>
         </div>
       </div>
+
+      {/* Performance Pace & Confidence Timeline */}
+      <PerformanceTimeline questionMetas={questionMetas} />
 
       {/* Topic Breakdown */}
       {score.topicScores && score.topicScores.length > 0 && (
