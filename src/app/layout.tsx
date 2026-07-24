@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "@/index.css";
 import { Providers } from "./providers";
@@ -6,11 +6,14 @@ import { GlobalNavbar } from "@/components/GlobalNavbar";
 
 const font = Plus_Jakarta_Sans({ subsets: ["latin"] });
 
+export const viewport: Viewport = {
+  themeColor: "#040404",
+};
+
 export const metadata: Metadata = {
   title: "Orbit — AI Tutor & Assessments",
   description: "Dynamic AI Learning & Adaptive Assessments Dashboard built for the Hackathon.",
   manifest: "/manifest.json",
-  themeColor: "#040404",
 };
 
 export default function RootLayout({

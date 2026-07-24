@@ -172,11 +172,7 @@ export default function Dashboard() {
   const activeCourseLabel = profile?.course ? profile.course.toUpperCase() : "BTECH";
 
   return (
-<<<<<<< HEAD
     <div className="w-full max-w-5xl mx-auto space-y-12 sm:space-y-24 pt-20 sm:pt-32 pb-10 sm:pb-16 px-4 sm:px-6 vignette-bg select-none">
-=======
-    <div className="w-full max-w-5xl mx-auto space-y-24 pt-32 px-6 pb-16 vignette-bg select-none">
->>>>>>> c0d0e9c (style: add horizontal padding to dashboard and profile pages for mobile margins)
       
       {/* 1. HERO SPLIT SECTION - High contrast & catchy */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-10 items-stretch">
