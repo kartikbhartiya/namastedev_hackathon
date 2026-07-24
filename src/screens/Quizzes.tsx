@@ -63,7 +63,12 @@ interface QuizAttempt {
   completedAt: any;
 }
 
-export function Quizzes() {
+interface QuizzesProps {
+  initialAction?: string | null;
+  initialTopic?: string | null;
+}
+
+export function Quizzes({ initialAction, initialTopic }: QuizzesProps = {}) {
   const { user, profile } = useAuth();
   const { theme } = useTheme();
   const router = useRouter();
