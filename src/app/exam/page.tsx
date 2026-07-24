@@ -5,6 +5,7 @@ import { ArrowLeft, Clock, ShieldCheck, FileCheck, CheckCircle2, XCircle, AlertT
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { generateAIResponse } from "@/lib/groq";
+import { addGlobalMemory } from "@/lib/aiMemory";
 
 type Question = {
   id: number;
@@ -161,7 +162,13 @@ export default function ExamHall() {
         cleanJson = raw.split("```")[1].split("```")[0].trim();
       }
 
-      setResults(JSON.parse(cleanJson));
+      const parsed = JSON.parse(cleanJson);
+      setResults(parsed);
+      
+      addGlobalMemory(
+        "Exam", 
+        `Completed timed engineering exam. Score: ${parsed.score}. Feedback summary: ${parsed.timeAnalysis || "Good effort."}`
+      );
     } catch (e) {
       console.error(e);
       alert("Failed to grade exam. Check API keys.");

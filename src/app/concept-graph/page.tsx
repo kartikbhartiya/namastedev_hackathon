@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { generateAIResponse, generateAIResponseStream } from "@/lib/groq";
 import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
+import { addGlobalMemory } from "@/lib/aiMemory";
 
 type ConceptNode = {
   name: string;
@@ -55,7 +56,10 @@ export default function ConceptGraph() {
       if (raw.includes("```json")) cleanJson = raw.split("```json")[1].split("```")[0].trim();
       else if (raw.includes("```")) cleanJson = raw.split("```")[1].split("```")[0].trim();
       
-      setGraphData(JSON.parse(cleanJson));
+      const parsed = JSON.parse(cleanJson);
+      setGraphData(parsed);
+      
+      addGlobalMemory("Concept Graph", `Generated a visual syllabus breakdown for topic: "${topic}"`);
     } catch (err) {
       console.error(err);
       alert("Failed to generate concept graph. Check your API limits or keys.");
@@ -77,6 +81,8 @@ export default function ConceptGraph() {
         res += chunk;
         setNodeExplanation(res);
       }
+      
+      addGlobalMemory("Concept Graph", `Explored concept node: "${node.name}" under topic "${graphData?.name}"`);
     } catch (err) {
       console.error(err);
       setNodeExplanation("Failed to load explanation.");
