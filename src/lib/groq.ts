@@ -9,6 +9,7 @@ import {
     loadProviderConfig,
     type AIProviderSettings,
 } from "./aiProvider";
+import { getGlobalMemoryContext } from "./aiMemory";
 
 // Register available providers
 import { groqProvider } from "./providers/groqProvider";
@@ -34,9 +35,11 @@ export async function generateAIResponse(
 
     const config = await loadProviderConfig();
     const startTime = Date.now();
+    const memoryContext = getGlobalMemoryContext();
+    const finalSystemPrompt = systemPrompt + memoryContext;
 
     try {
-        return await callProvider(config, config.activeProvider, systemPrompt, userPrompt, temperature, startTime);
+        return await callProvider(config, config.activeProvider, finalSystemPrompt, userPrompt, temperature, startTime);
     } catch (primaryError) {
         console.error(`Primary provider (${config.activeProvider}) failed:`, primaryError);
 
@@ -108,12 +111,14 @@ export async function* generateAIResponseStream(
     }
 
     const startTime = Date.now();
+    const memoryContext = getGlobalMemoryContext();
+    const finalSystemPrompt = systemPrompt + memoryContext;
 
     try {
         if (!provider.generateCompletionStream) {
             // Fallback to non-streaming if provider doesn't support it
             const result = await provider.generateCompletion(
-                systemPrompt,
+                finalSystemPrompt,
                 userPrompt,
                 providerConfig.model,
                 temperature,
@@ -126,7 +131,7 @@ export async function* generateAIResponseStream(
         }
 
         const stream = provider.generateCompletionStream(
-            systemPrompt,
+            finalSystemPrompt,
             userPrompt,
             providerConfig.model,
             temperature,

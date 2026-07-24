@@ -15,6 +15,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { sounds } from "@/lib/soundEffects";
+import { addGlobalMemory } from "@/lib/aiMemory";
 
 import { InterviewSetup } from "@/components/interview/InterviewSetup";
 import { InterviewScorecard } from "@/components/interview/InterviewScorecard";
@@ -539,6 +540,11 @@ export default function InterviewMode() {
           messages.filter(m => m.role !== "system")
         ).catch(console.error);
       }
+      
+      addGlobalMemory(
+          "Interview", 
+          `Completed ${config.seniority} level ${config.role} interview. Score: ${evaluation.totalScore}/100. Strengths: ${evaluation.strengths.join(", ")}. Red flags: ${evaluation.redFlags.join(", ")}.`
+      );
 
       setPhase("report");
     } catch (err) {

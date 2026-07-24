@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Bot, Send, Plus, Trash2, MessageSquare, Menu, X, User, Settings, Sparkles, Play, HelpCircle, Mic, TerminalSquare } from "lucide-react";
+import { ArrowLeft, Bot, Send, Plus, Trash2, MessageSquare, Menu, X, User, Settings, Sparkles, Play, HelpCircle, Mic, TerminalSquare, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { generateAIResponseStream } from "@/lib/groq";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/supabase";
+import { addGlobalMemory } from "@/lib/aiMemory";
 import { ModeSelector, TutorMode } from "@/components/ai-tutor/ModeSelector";
 import { MindMapViewer } from "@/components/ai-tutor/MindMapViewer";
 import { StudyPlanCard } from "@/components/ai-tutor/StudyPlanCard";
@@ -34,6 +35,7 @@ import {
 } from "@/lib/aiTutor";
 
 interface Message {
+  id: string;
   role: "user" | "assistant" | "system";
   content: string;
   metadata?: {
@@ -71,6 +73,10 @@ export function AITutor() {
   const [simParams, setSimParams] = useState<Record<string, number>>({});
   const [selectedPresetSim, setSelectedPresetSim] = useState<string | null>(null);
   const [isListening, setIsListening] = useState(false);
+  
+  // UX State
+  const [activeFeatureMsgId, setActiveFeatureMsgId] = useState<string | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Load sessions from Supabase if authenticated, else localStorage
@@ -86,7 +92,12 @@ export function AITutor() {
                 return {
                   id: s.id,
                   title: s.title || "Study Session",
-                  messages: msgs.map((m: any): Message => ({ role: (m.role || "assistant") as "user" | "assistant" | "system", content: m.content, metadata: m.metadata })),
+                  messages: msgs.map((m: any, i: number): Message => ({ 
+                    id: m.id || `msg-${Date.now()}-${i}`,
+                    role: (m.role || "assistant") as "user" | "assistant" | "system", 
+                    content: m.content, 
+                    metadata: m.metadata 
+                  })),
                   createdAt: s.created_at || new Date().toISOString()
                 };
               })
@@ -105,8 +116,13 @@ export function AITutor() {
       if (saved) {
         try {
           const parsed = JSON.parse(saved) as ChatSession[];
-          setSessions(parsed);
-          if (parsed.length > 0) setActiveSessionId(parsed[0].id);
+          // ensure legacy messages have IDs
+          const migrated = parsed.map(s => ({
+              ...s,
+              messages: s.messages.map((m, i) => ({ ...m, id: m.id || `msg-${Date.now()}-${i}` }))
+          }));
+          setSessions(migrated);
+          if (migrated.length > 0) setActiveSessionId(migrated[0].id);
         } catch (e) {
           console.error(e);
         }
@@ -116,6 +132,7 @@ export function AITutor() {
           title: "Welcome to Orbit AI",
           messages: [
             {
+              id: "msg-welcome-1",
               role: "assistant",
               content: "Welcome! I am **Orbit**, your AI Computer Science & STEM Tutor. Select a mode above to generate **Mind Maps**, **Interactive Simulations**, **Study Plans**, **AI Quizzes**, or ask any code & logic doubt!"
             }
@@ -142,6 +159,15 @@ export function AITutor() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [activeSession?.messages, isResponding]);
 
+  // When session changes, clear active feature if it doesn't exist in new session
+  useEffect(() => {
+    if (activeSession && activeFeatureMsgId) {
+      if (!activeSession.messages.find(m => m.id === activeFeatureMsgId)) {
+        setActiveFeatureMsgId(null);
+      }
+    }
+  }, [activeSessionId]);
+
   const handleNewSession = async () => {
     let newId = `session-${Date.now()}`;
     const newSession: ChatSession = {
@@ -149,6 +175,7 @@ export function AITutor() {
       title: `Session ${sessions.length + 1}`,
       messages: [
         {
+          id: `msg-${Date.now()}`,
           role: "assistant",
           content: "Started a new study session. What topic, algorithm, or concept shall we master today?"
         }
@@ -173,6 +200,7 @@ export function AITutor() {
     saveSessions(updated);
     setActiveSessionId(newId);
     setSidebarOpen(false);
+    setActiveFeatureMsgId(null);
   };
 
   const handleDeleteSession = async (id: string, e: React.MouseEvent) => {
@@ -188,6 +216,7 @@ export function AITutor() {
     saveSessions(updated);
     if (activeSessionId === id) {
       setActiveSessionId(updated.length > 0 ? updated[0].id : null);
+      setActiveFeatureMsgId(null);
     }
   };
 
@@ -196,7 +225,7 @@ export function AITutor() {
     if (!input.trim() || isResponding || !activeSessionId || !activeSession) return;
 
     const queryText = input.trim();
-    const userMessage: Message = { role: "user", content: queryText, metadata: { mode: activeMode } };
+    const userMessage: Message = { id: `msg-u-${Date.now()}`, role: "user", content: queryText, metadata: { mode: activeMode } };
     const updatedMessages = [...activeSession.messages, userMessage];
 
     let newTitle = activeSession.title;
@@ -218,31 +247,41 @@ export function AITutor() {
       db.aiMessages.send(activeSessionId, "user", queryText).catch(console.error);
     }
 
+    // Add to global context memory
+    addGlobalMemory("AITutor", `User asked: "${queryText}" in mode: ${activeMode}`);
+
     try {
-      let assistantMsg: Message = { role: "assistant", content: "" };
+      const assistantMsgId = `msg-a-${Date.now()}`;
+      let assistantMsg: Message = { id: assistantMsgId, role: "assistant", content: "" };
 
       // Handle specialized tutor modes
       if (activeMode === "mindmap") {
         const mindMapData = await generateMindMapData(queryText, DEFAULT_TUTOR_PROFILE, { name: "Student" });
         assistantMsg = {
+          id: assistantMsgId,
           role: "assistant",
-          content: `Here is the visual concept mind map for **${queryText}**:`,
+          content: `Here is the visual concept mind map for **${queryText}**.`,
           metadata: { mode: "mindmap", mindMap: mindMapData || undefined }
         };
+        addGlobalMemory("AITutor", `Generated a mind map for ${queryText}`);
       } else if (activeMode === "studyplan") {
         const planData = await generateStudyPlan(queryText, 7, DEFAULT_TUTOR_PROFILE, { name: "Student" });
         assistantMsg = {
+          id: assistantMsgId,
           role: "assistant",
-          content: `Generated a structured **7-Day Mastery Roadmap** for **${queryText}**:`,
+          content: `Generated a structured **7-Day Mastery Roadmap** for **${queryText}**.`,
           metadata: { mode: "studyplan", studyPlan: planData }
         };
+        addGlobalMemory("AITutor", `Generated a study plan for ${queryText}`);
       } else if (activeMode === "quiz") {
         const quizData = await generateQuiz(queryText, "medium", 5, DEFAULT_TUTOR_PROFILE, { name: "Student" });
         assistantMsg = {
+          id: assistantMsgId,
           role: "assistant",
-          content: `Generated a custom 5-question quiz for **${queryText}**:`,
+          content: `Generated a custom 5-question quiz for **${queryText}**.`,
           metadata: { mode: "quiz", quiz: quizData }
         };
+        addGlobalMemory("AITutor", `Generated a quiz for ${queryText}`);
       } else if (activeMode === "visualization") {
         const simConfig = await generateDynamicSimulation(queryText, DEFAULT_TUTOR_PROFILE, { name: "Student" });
         if (simConfig?.parameters) {
@@ -251,17 +290,21 @@ export function AITutor() {
           setSimParams(defaults);
         }
         assistantMsg = {
+          id: assistantMsgId,
           role: "assistant",
-          content: `Generated an interactive simulation model for **${queryText}**:`,
+          content: `Generated an interactive simulation model for **${queryText}**.`,
           metadata: { mode: "visualization", simulation: simConfig || undefined }
         };
+        addGlobalMemory("AITutor", `Generated an interactive simulation for ${queryText}`);
       } else if (activeMode === "video") {
         const scriptData = await generateVideoScript(queryText, DEFAULT_TUTOR_PROFILE, { name: "Student" });
         assistantMsg = {
+          id: assistantMsgId,
           role: "assistant",
-          content: `Created an educational video script for **${queryText}**:`,
+          content: `Created an educational video script for **${queryText}**.`,
           metadata: { mode: "video", videoScript: scriptData || undefined }
         };
+        addGlobalMemory("AITutor", `Generated a video script for ${queryText}`);
       } else if (activeMode === "debugger") {
         const DEBUGGER_PROMPT = `You are Orbit Code Debugger, an expert Socratic programming mentor.
 Help the student find and fix bugs in their code.
@@ -277,7 +320,7 @@ Help the student find and fix bugs in their code.
         let streamedContent = "";
         const templateSession: ChatSession = {
           ...updatedSession,
-          messages: [...updatedMessages, { role: "assistant", content: "" }]
+          messages: [...updatedMessages, { id: assistantMsgId, role: "assistant", content: "" }]
         };
         setSessions(sessions.map(s => s.id === activeSessionId ? templateSession : s));
 
@@ -285,11 +328,11 @@ Help the student find and fix bugs in their code.
           streamedContent += chunk;
           const liveSession: ChatSession = {
             ...updatedSession,
-            messages: [...updatedMessages, { role: "assistant", content: streamedContent }]
+            messages: [...updatedMessages, { id: assistantMsgId, role: "assistant", content: streamedContent }]
           };
           setSessions(sessions.map(s => s.id === activeSessionId ? liveSession : s));
         }
-        assistantMsg = { role: "assistant", content: streamedContent, metadata: { mode: "debugger" } };
+        assistantMsg = { id: assistantMsgId, role: "assistant", content: streamedContent, metadata: { mode: "debugger" } };
       } else {
         // Standard Text Streaming Mode
         const contextMessages = updatedMessages.slice(-8);
@@ -299,7 +342,7 @@ Help the student find and fix bugs in their code.
         let streamedContent = "";
         const templateSession: ChatSession = {
           ...updatedSession,
-          messages: [...updatedMessages, { role: "assistant", content: "" }]
+          messages: [...updatedMessages, { id: assistantMsgId, role: "assistant", content: "" }]
         };
         setSessions(sessions.map(s => s.id === activeSessionId ? templateSession : s));
 
@@ -307,11 +350,11 @@ Help the student find and fix bugs in their code.
           streamedContent += chunk;
           const liveSession: ChatSession = {
             ...updatedSession,
-            messages: [...updatedMessages, { role: "assistant", content: streamedContent }]
+            messages: [...updatedMessages, { id: assistantMsgId, role: "assistant", content: streamedContent }]
           };
           setSessions(sessions.map(s => s.id === activeSessionId ? liveSession : s));
         }
-        assistantMsg = { role: "assistant", content: streamedContent, metadata: { mode: "text" } };
+        assistantMsg = { id: assistantMsgId, role: "assistant", content: streamedContent, metadata: { mode: "text" } };
       }
 
       // Finalize message state
@@ -319,6 +362,11 @@ Help the student find and fix bugs in their code.
       const finalSession: ChatSession = { ...updatedSession, title: newTitle, messages: finalMessages };
       const finalSessions: ChatSession[] = sessions.map(s => s.id === activeSessionId ? finalSession : s);
       saveSessions(finalSessions);
+      
+      // Auto-open feature stage if a feature was generated
+      if (assistantMsg.metadata && Object.keys(assistantMsg.metadata).length > 1) {
+          setActiveFeatureMsgId(assistantMsg.id);
+      }
 
       if (user?.id) {
         db.aiMessages.send(activeSessionId, "assistant", assistantMsg.content, assistantMsg.metadata).catch(console.error);
@@ -327,6 +375,7 @@ Help the student find and fix bugs in their code.
     } catch (error) {
       console.error(error);
       const errorMsg: Message = {
+        id: `msg-err-${Date.now()}`,
         role: "assistant",
         content: "An error occurred while generating your tutor response. Please try again."
       };
@@ -335,6 +384,9 @@ Help the student find and fix bugs in their code.
       setIsResponding(false);
     }
   };
+
+  const activeFeatureMsg = activeSession?.messages.find(m => m.id === activeFeatureMsgId);
+  const showFeatureStage = activeFeatureMsg != null;
 
   return (
     <div className="min-h-screen bg-[#040404] text-white flex flex-col select-none">
@@ -431,84 +483,31 @@ Help the student find and fix bugs in their code.
           </div>
         </aside>
 
-        {/* Right Active Chat Workspace */}
-        <main className="flex-1 border border-white/10 rounded-2xl bg-[#0a0a0a] overflow-hidden flex flex-col relative">
-
-          {/* Special Simulation Launcher Banner in Simulation Mode */}
-          {activeMode === "visualization" && (
-            <div className="p-4 border-b border-white/10 bg-neutral-900/80 backdrop-blur-md space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-neutral-300 flex items-center gap-1.5">
-                  <Play className="w-3.5 h-3.5 text-emerald-400" /> Interactive Simulation Library
-                </span>
-                <span className="text-[10px] text-neutral-400">Select a pre-built scene or type any topic below</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {SIMULATION_REGISTRY.map(sim => (
-                  <button
-                    key={sim.id}
-                    onClick={() => setSelectedPresetSim(selectedPresetSim === sim.id ? null : sim.id)}
-                    className={cn(
-                      "px-3 py-1.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5",
-                      selectedPresetSim === sim.id
-                        ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400 shadow-md"
-                        : "bg-white/5 border-white/10 text-neutral-300 hover:bg-white/10"
-                    )}
-                  >
-                    <span>{sim.emoji}</span>
-                    <span>{sim.title}</span>
-                  </button>
-                ))}
-              </div>
-
-              {selectedPresetSim && (
-                <div className="mt-3 pt-3 border-t border-white/10">
-                  <SimulationEngine
-                    activeSimId={selectedPresetSim}
-                    onClearActiveSimId={() => setSelectedPresetSim(null)}
-                  />
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Special Standalone Quiz Widget in Quiz Mode when no quiz in history */}
-          {activeMode === "quiz" && !activeSession?.messages.some(m => m.metadata?.quiz) && (
-            <div className="p-6">
-              <QuizCard
-                questions={[]}
-                onGenerate={(qList) => {
-                  if (activeSessionId) {
-                    const quizMsg: Message = {
-                      role: "assistant",
-                      content: "Here is your custom AI practice quiz:",
-                      metadata: { mode: "quiz", quiz: qList }
-                    };
-                    const updated = [...(activeSession?.messages || []), quizMsg];
-                    saveSessions(sessions.map(s => s.id === activeSessionId ? { ...s, messages: updated } : s));
-                  }
-                }}
-              />
-            </div>
-          )}
-
+        {/* Chat Feed */}
+        <main className={cn(
+          "border border-white/10 rounded-2xl bg-[#0a0a0a] overflow-hidden flex flex-col relative transition-all duration-300",
+          showFeatureStage ? "hidden md:flex flex-1 md:max-w-sm lg:max-w-md shrink-0" : "flex-1"
+        )}>
+          
           {/* Chat Messages */}
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 custom-scrollbar">
             {activeSession ? (
-              activeSession.messages.map((m, idx) => {
+              activeSession.messages.map((m) => {
                 const isAssistant = m.role === "assistant";
                 const isDebugger = m.metadata?.mode === "debugger";
+                
+                const hasFeature = m.metadata && Object.keys(m.metadata).length > 1; // more than just 'mode'
 
                 return (
                   <div
-                    key={idx}
+                    key={m.id}
                     className={cn(
-                      "flex gap-3 sm:gap-4 p-4 rounded-2xl border max-w-[95%] sm:max-w-[85%] transition-all",
+                      "flex gap-3 sm:gap-4 p-4 rounded-2xl border transition-all w-full",
                       isDebugger && isAssistant
-                        ? "bg-black border-green-500/30 font-mono shadow-[0_0_15px_rgba(34,197,94,0.1)] w-full max-w-[100%] rounded-md"
+                        ? "bg-black border-green-500/30 font-mono shadow-[0_0_15px_rgba(34,197,94,0.1)] rounded-md"
                         : isAssistant
-                          ? "bg-neutral-900/50 border-white/10 mr-auto"
-                          : "bg-primary/10 border-primary/20 ml-auto"
+                          ? "bg-neutral-900/50 border-white/10 mr-auto max-w-[95%] sm:max-w-[90%]"
+                          : "bg-primary/10 border-primary/20 ml-auto max-w-[95%] sm:max-w-[85%]"
                     )}
                   >
                     <div className={cn(
@@ -537,37 +536,26 @@ Help the student find and fix bugs in their code.
                       {m.content && (
                         <ChatMarkdown content={m.content} />
                       )}
-
-                      {/* Render Specialized Tutor Mode Artifacts */}
-                      {m.metadata?.mindMap && (
-                        <div className="mt-4 pt-4 border-t border-white/10">
-                          <MindMapViewer data={m.metadata.mindMap} />
-                        </div>
+                      
+                      {/* Button to open feature in stage */}
+                      {hasFeature && (
+                          <Button 
+                              onClick={() => setActiveFeatureMsgId(m.id)}
+                              variant="outline" 
+                              size="sm" 
+                              className={cn(
+                                "mt-2 border-primary/30 text-primary hover:bg-primary/10 gap-2 w-full",
+                                activeFeatureMsgId === m.id ? "bg-primary/20 border-primary" : ""
+                              )}
+                          >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                              View {m.metadata?.mode === 'mindmap' ? 'Mind Map' : 
+                                    m.metadata?.mode === 'quiz' ? 'Quiz' : 
+                                    m.metadata?.mode === 'studyplan' ? 'Study Plan' : 
+                                    m.metadata?.mode === 'visualization' ? 'Simulation' : 'Generated Asset'}
+                          </Button>
                       )}
 
-                      {m.metadata?.studyPlan && (
-                        <div className="mt-4 pt-4 border-t border-white/10">
-                          <StudyPlanCard plan={m.metadata.studyPlan} />
-                        </div>
-                      )}
-
-                      {m.metadata?.quiz && (
-                        <div className="mt-4 pt-4 border-t border-white/10">
-                          <QuizCard questions={m.metadata.quiz} />
-                        </div>
-                      )}
-
-                      {m.metadata?.simulation && (
-                        <div className="mt-4 pt-4 border-t border-white/10 space-y-4">
-                          <DynamicSimRenderer config={m.metadata.simulation} paramValues={simParams} />
-                        </div>
-                      )}
-
-                      {m.metadata?.videoScript && (
-                        <div className="mt-4 pt-4 border-t border-white/10">
-                          <VideoScriptCard script={m.metadata.videoScript} />
-                        </div>
-                      )}
                     </div>
                   </div>
                 );
@@ -587,17 +575,7 @@ Help the student find and fix bugs in their code.
               placeholder={
                 isResponding
                   ? "Orbit is generating response..."
-                  : activeMode === "mindmap"
-                  ? "Enter concept for Mind Map (e.g. Binary Search Trees)..."
-                  : activeMode === "studyplan"
-                  ? "Enter topic for 7-day study plan (e.g. Dynamic Programming)..."
-                  : activeMode === "quiz"
-                  ? "Enter topic for AI Quiz (e.g. React Hooks, Gauss's Law)..."
-                  : activeMode === "debugger"
-                  ? "Paste your buggy code or error log here for Socratic guidance..."
-                  : activeMode === "visualization"
-                  ? "Enter system to simulate (e.g. Projectile Motion, QuickSort)..."
-                  : "Ask Orbit anything about algorithms, systems, or code..."
+                  : "Ask Orbit anything..."
               }
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -624,8 +602,88 @@ Help the student find and fix bugs in their code.
               <Send className="w-4 h-4" />
             </Button>
           </form>
-
         </main>
+        
+        {/* Right Active Feature Stage */}
+        {showFeatureStage && (
+          <section className="flex-1 border border-white/10 rounded-2xl bg-[#0c0c0c] overflow-hidden flex flex-col relative animate-in slide-in-from-right-4 duration-300">
+             <div className="p-3 sm:p-4 border-b border-white/10 bg-neutral-900/50 flex justify-between items-center z-10 backdrop-blur-md">
+                 <div className="flex items-center gap-2">
+                     <Sparkles className="w-4 h-4 text-primary" />
+                     <span className="text-sm font-bold text-neutral-300 uppercase tracking-widest">
+                         {activeFeatureMsg?.metadata?.mode === 'mindmap' ? 'Concept Map Explorer' : 
+                          activeFeatureMsg?.metadata?.mode === 'quiz' ? 'Knowledge Check' : 
+                          activeFeatureMsg?.metadata?.mode === 'studyplan' ? 'Mastery Roadmap' : 
+                          activeFeatureMsg?.metadata?.mode === 'visualization' ? 'Interactive Simulation' : 'Active Workspace'}
+                     </span>
+                 </div>
+                 <Button variant="ghost" size="icon" onClick={() => setActiveFeatureMsgId(null)} className="text-neutral-500 hover:text-white">
+                     <X className="w-5 h-5" />
+                 </Button>
+             </div>
+             
+             <div className="flex-1 overflow-y-auto custom-scrollbar relative">
+                {/* Special Simulation Launcher Banner in Simulation Mode */}
+                {activeFeatureMsg?.metadata?.mode === "visualization" && (
+                  <div className="p-4 border-b border-white/10 bg-neutral-900/80 backdrop-blur-md space-y-3 sticky top-0 z-20">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-neutral-300 flex items-center gap-1.5">
+                        <Play className="w-3.5 h-3.5 text-emerald-400" /> Pre-built Models
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {SIMULATION_REGISTRY.map(sim => (
+                        <button
+                          key={sim.id}
+                          onClick={() => setSelectedPresetSim(selectedPresetSim === sim.id ? null : sim.id)}
+                          className={cn(
+                            "px-3 py-1.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5",
+                            selectedPresetSim === sim.id
+                              ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400 shadow-md"
+                              : "bg-white/5 border-white/10 text-neutral-300 hover:bg-white/10"
+                          )}
+                        >
+                          <span>{sim.emoji}</span>
+                          <span>{sim.title}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    {selectedPresetSim && (
+                      <div className="mt-3 pt-3 border-t border-white/10">
+                        <SimulationEngine
+                          activeSimId={selectedPresetSim}
+                          onClearActiveSimId={() => setSelectedPresetSim(null)}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+                 
+                <div className="p-4 sm:p-6 w-full max-w-4xl mx-auto h-full min-h-[500px]">
+                    {activeFeatureMsg?.metadata?.mindMap && (
+                      <MindMapViewer data={activeFeatureMsg.metadata.mindMap} />
+                    )}
+
+                    {activeFeatureMsg?.metadata?.studyPlan && (
+                      <StudyPlanCard plan={activeFeatureMsg.metadata.studyPlan} />
+                    )}
+
+                    {activeFeatureMsg?.metadata?.quiz && (
+                      <QuizCard questions={activeFeatureMsg.metadata.quiz} />
+                    )}
+
+                    {activeFeatureMsg?.metadata?.simulation && (
+                      <DynamicSimRenderer config={activeFeatureMsg.metadata.simulation} paramValues={simParams} />
+                    )}
+
+                    {activeFeatureMsg?.metadata?.videoScript && (
+                      <VideoScriptCard script={activeFeatureMsg.metadata.videoScript} />
+                    )}
+                </div>
+             </div>
+          </section>
+        )}
 
       </div>
     </div>
