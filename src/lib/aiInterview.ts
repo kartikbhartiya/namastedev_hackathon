@@ -30,6 +30,10 @@ export interface InterviewConfig {
   enableWebcam: boolean;
   perQuestionTimeLimitSec: number; // 0 = unlimited
   voiceMode: VoiceMode;
+  // New proctoring and custom parameters
+  roundType: "dsa" | "system-design" | "behavioral" | "resume-fit" | "full-loop";
+  resumeText: string;
+  jobDescription: string;
 }
 
 export interface QuestionMeta {
@@ -119,6 +123,44 @@ export function buildInterviewSystemPrompt(config: InterviewConfig): string {
   const seniorityInfo = SENIORITY_OPTIONS.find(s => s.value === config.seniority)!;
   const companyInfo = COMPANY_OPTIONS.find(c => c.value === config.companyStyle)!;
 
+  let roundGuidelines = "";
+  if (config.roundType === "dsa") {
+    roundGuidelines = `
+ROUND TYPE: Data Structures & Algorithms (DSA) / Coding
+- You MUST present a clear coding problem for the candidate to solve.
+- Instruct them to write their solution in the JavaScript Scratchpad and submit it for your review using the 'Submit Code for Review' button.
+- Do not let them off easy. Challenge their choice of algorithms, time/space complexity (Big-O), and edge cases.
+- Analyze their submitted code closely when they send it for review.`;
+  } else if (config.roundType === "system-design") {
+    roundGuidelines = `
+ROUND TYPE: System Design
+- Focus strictly on large-scale software systems, load balancing, caching, database replication, message queues, and high availability.
+- Do not ask coding questions. Ask architectural questions and evaluate how they model scalability, latency, data safety, and trade-offs.`;
+  } else if (config.roundType === "behavioral") {
+    roundGuidelines = `
+ROUND TYPE: Behavioral & Leadership
+- Evaluate conflict resolution, leadership, failure recovery, and cross-team alignment.
+- Use the STAR (Situation, Task, Action, Result) methodology. Probe for concrete metrics and specific actions they took.`;
+  } else if (config.roundType === "resume-fit") {
+    roundGuidelines = `
+ROUND TYPE: Resume & Role-Fit Review
+- You must review the candidate's Resume and Job Description.
+- Ask questions directly related to their past experience, projects, tech stack, and achievements as documented in their resume.
+- Test how their skillset aligns with the target role description.`;
+  } else {
+    roundGuidelines = `
+ROUND TYPE: Full Loop Comprehensive Mock
+- Cover a mix of conceptual questions, coding/DSA, system design (if senior), and behavioral/resume projects.
+- Make the transition between rounds professional.`;
+  }
+
+  const resumeContext = config.resumeText 
+    ? `\nCANDIDATE RESUME:\n${config.resumeText}\n` 
+    : "";
+  const jobContext = config.jobDescription 
+    ? `\nTARGET JOB ROLE & DESCRIPTION:\n${config.jobDescription}\n` 
+    : "";
+
   return `You are a strict, experienced senior technical interviewer at a ${companyInfo.label} company.
 You are conducting a ${seniorityInfo.label} ${roleInfo.label} interview.
 
@@ -126,7 +168,7 @@ INTERVIEW CONTEXT:
 - Role: ${roleInfo.label} (${roleInfo.desc})
 - Seniority Target: ${seniorityInfo.label} — ${seniorityInfo.desc}
 - Company Style: ${companyInfo.label} — ${companyInfo.desc}
-- Key Topics to Cover: ${roleInfo.topics.join(", ")}
+- Key Topics to Cover: ${roleInfo.topics.join(", ")}${roundGuidelines}${resumeContext}${jobContext}
 - Total Questions Target: ${config.questionCount}
 
 QUESTION TAGGING FORMAT:
@@ -146,7 +188,7 @@ For follow-up probes on the SAME question, do NOT add a new tag. Just ask natura
 
 INTERVIEWER RULES:
 1. Start with a warm but professional greeting. Then ask your first question with the tag.
-2. Ask questions appropriate for the ${config.seniority} level. ${config.seniority === "senior" ? "Include at least one system design question." : ""}
+2. Ask questions appropriate for the ${config.seniority} level. ${config.seniority === "senior" || config.roundType === "system-design" ? "Include at least one system design question." : ""}
 3. After each candidate answer, analyze it critically:
    - If incomplete or vague, probe deeper with "Can you elaborate on..." or "What about edge cases?"
    - If incorrect, correct them directly but professionally: "That's not quite right. The issue is..."
@@ -156,10 +198,11 @@ INTERVIEWER RULES:
 6. Keep responses concise (3-5 sentences max per turn).
 7. After covering ${config.questionCount} questions, say "That concludes our interview" and provide a brief verbal summary.
 8. Track which topics you've covered. Try to cover at least 3 different topic areas.
-${config.role === "behavioral" ? "9. Use the STAR method to evaluate responses. Ask for specific examples." : ""}
-${config.companyStyle === "google" ? "10. Emphasize algorithmic efficiency and Big-O time/space complexity analysis. Ask candidate to optimize their solution." : ""}
-${config.companyStyle === "amazon" ? "10. Evaluate against Amazon Leadership Principles (Customer Obsession, Ownership, Bias for Action). Demand specific metrics and outcomes." : ""}
-9. Mix question types: at least 1 conceptual, 1 practical/coding.`;
+9. If a resume is provided, ask at least 2 questions directly about the experiences, projects, or technologies mentioned in the resume.
+${config.role === "behavioral" || config.roundType === "behavioral" ? "10. Use the STAR method to evaluate responses. Ask for specific examples." : ""}
+${config.companyStyle === "google" ? "11. Emphasize algorithmic efficiency and Big-O time/space complexity analysis. Ask candidate to optimize their solution." : ""}
+${config.companyStyle === "amazon" ? "11. Evaluate against Amazon Leadership Principles (Customer Obsession, Ownership, Bias for Action). Demand specific metrics and outcomes." : ""}
+10. Mix question types: at least 1 conceptual, 1 practical/coding.`;
 }
 
 // ——— Question Tag Parser ———
@@ -260,10 +303,13 @@ export const DEFAULT_INTERVIEW_CONFIG: InterviewConfig = {
   seniority: "mid",
   companyStyle: "faang",
   questionCount: 5,
-  enableVoice: false,
+  enableVoice: true,
   enableScratchpad: true,
   enableProctoring: true,
-  enableWebcam: false,
+  enableWebcam: true,
   perQuestionTimeLimitSec: 300, // 5 min
-  voiceMode: "off",
+  voiceMode: "continuous",
+  roundType: "full-loop",
+  resumeText: "",
+  jobDescription: "",
 };

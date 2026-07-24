@@ -72,35 +72,129 @@ export default function InterviewMode() {
   const [showConfidenceRating, setShowConfidenceRating] = useState(false);
   const [pendingConfidence, setPendingConfidence] = useState(0);
 
+  // ——— Exit block & Natural voices updates ———
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [voicesLoaded, setVoicesLoaded] = useState(false);
+
+  // Sync state refs to prevent speech recognition from restarting on every message/loading change
+  const phaseRef = useRef(phase);
+  const messagesRef = useRef(messages);
+  const systemPromptRef = useRef(systemPrompt);
+  const isLoadingRef = useRef(isLoading);
+
+  useEffect(() => { phaseRef.current = phase; }, [phase]);
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
+  useEffect(() => { systemPromptRef.current = systemPrompt; }, [systemPrompt]);
+  useEffect(() => { isLoadingRef.current = isLoading; }, [isLoading]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      const handleVoicesChanged = () => setVoicesLoaded(prev => !prev);
+      window.speechSynthesis.addEventListener("voiceschanged", handleVoicesChanged);
+      return () => window.speechSynthesis.removeEventListener("voiceschanged", handleVoicesChanged);
+    }
+  }, []);
+
+  // Exit warning hook
+  useEffect(() => {
+    if (phase !== "live") return;
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "Are you sure you want to exit the interview? Your progress will be lost.";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [phase]);
+
+  // Regex-based Javascript syntax tokenizer
+  const tokenise = (code: string) => {
+    const rules = [
+      { type: 'comment', regex: /^\/\/.*|^\/\*[\s\S]*?\*\// },
+      { type: 'string', regex: /^"(?:\\.|[^"\\])*"|^'(?:\\.|[^'\\])*'|^`(?:\\.|[^`\\])*`/ },
+      { type: 'number', regex: /^\b\d+(?:\.\d+)?\b/ },
+      { type: 'keyword', regex: /^\b(const|let|var|function|return|if|else|for|while|do|switch|case|break|continue|class|export|import|from|new|this|typeof|instanceof|async|await|try|catch|finally|throw|default|null|undefined|true|false)\b/ },
+      { type: 'builtin', regex: /^\b(console|log|error|warn|info|Math|JSON|Date|RegExp|Map|Set|Promise|Array|Object|String|Number|Boolean|window|document)\b/ },
+      { type: 'function', regex: /^[a-zA-Z_$][a-zA-Z0-9_$]*(?=\s*\()/ },
+      { type: 'identifier', regex: /^[a-zA-Z_$][a-zA-Z0-9_$]*/ },
+      { type: 'whitespace', regex: /^\s+/ },
+      { type: 'operator', regex: /^[\+\-\*\/%&\|\^!~=<>?:;.,{}()\[\]]/ },
+      { type: 'text', regex: /^./ }
+    ];
+
+    let text = code;
+    const tokens = [];
+    while (text.length > 0) {
+      let matched = false;
+      for (const rule of rules) {
+        const match = text.match(rule.regex);
+        if (match) {
+          tokens.push({ type: rule.type, value: match[0] });
+          text = text.substring(match[0].length);
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) {
+        tokens.push({ type: 'text', value: text[0] });
+        text = text.substring(1);
+      }
+    }
+    return tokens;
+  };
+
   // ——— Scratchpad ———
   const [scratchpadOpen, setScratchpadOpen] = useState(false);
   const [scratchpadCode, setScratchpadCode] = useState("// Write your code or notes here...\nconsole.log('Testing code execution...');\n");
   const [executionOutput, setExecutionOutput] = useState<string | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
 
-  const handleRunCode = () => {
+  // Submit code scratchpad to Groq for AI Interviewer review
+  const handleSubmitCodeForReview = async () => {
+    if (isLoadingRef.current || !config) return;
     setIsExecuting(true);
-    setExecutionOutput(null);
-    try {
-      const logs: string[] = [];
-      const customConsole = {
-        log: (...args: any[]) => logs.push(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(" ")),
-        error: (...args: any[]) => logs.push("[ERROR] " + args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(" ")),
-        warn: (...args: any[]) => logs.push("[WARN] " + args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(" ")),
-      };
-      const runFn = new Function("console", scratchpadCode);
-      const startTime = performance.now();
-      runFn(customConsole);
-      const endTime = performance.now();
-      const duration = (endTime - startTime).toFixed(2);
+    setExecutionOutput("AI Interviewer is analyzing your code details...");
+    stopSpeaking();
+    sounds.playSubmitChime();
 
-      const outputText = logs.length > 0
-        ? logs.join("\n") + `\n\n[Done in ${duration}ms]`
-        : `Code executed successfully with no console output. [Done in ${duration}ms]`;
-      setExecutionOutput(outputText);
-    } catch (err: any) {
-      setExecutionOutput(`[Runtime Error]: ${err?.message || err}`);
+    const codeMessage = `Here is my code implementation for review:\n\`\`\`javascript\n${scratchpadCode}\n\`\`\``;
+    const newMessages: Message[] = [...messagesRef.current, { role: "user", content: codeMessage }];
+    setMessages(newMessages);
+    setIsLoading(true);
+
+    try {
+      const conversationHistory = newMessages
+        .filter(m => m.role !== "system")
+        .map(m => `${m.role === "user" ? "Candidate" : "Interviewer"}: ${m.content}`)
+        .join("\n");
+
+      const aiPrompt = `Conversation History:\n${conversationHistory}\n\nReview the candidate's last submitted code. Explain details clearly: point out syntactical or logical bugs, runtime complexities, or edge-case failures. Provide strict feedback in 3-4 sentences.`;
+
+      const stream = generateAIResponseStream(systemPromptRef.current, aiPrompt, 0.7);
+
+      let aiResponse = "";
+      setMessages(prev => [...prev, { role: "assistant", content: "" }]);
+
+      for await (const chunk of stream) {
+        aiResponse += chunk;
+        setMessages(prev => [
+          ...prev.slice(0, -1),
+          { role: "assistant", content: aiResponse },
+        ]);
+      }
+
+      const qMeta = parseQuestionTag(aiResponse);
+      if (qMeta) {
+        setQuestionMetas(prev => [...prev, qMeta]);
+        setCurrentQuestion(qMeta);
+      }
+
+      speakText(aiResponse);
+      setExecutionOutput(`Reviewed by Interviewer:\n\n${stripQuestionTag(aiResponse)}`);
+    } catch (error) {
+      console.error(error);
+      setExecutionOutput("[Error]: Failed to retrieve AI Code Review. Please try again.");
     } finally {
+      setIsLoading(false);
       setIsExecuting(false);
     }
   };
@@ -276,8 +370,19 @@ export default function InterviewMode() {
     // Pick best available voice (English US/UK natural)
     const voices = window.speechSynthesis.getVoices();
     const preferredVoice = voices.find(v =>
-      (v.lang.includes("en") && (v.name.includes("Natural") || v.name.includes("Google") || v.name.includes("Samantha") || v.name.includes("Daniel")))
-    ) || voices.find(v => v.lang.includes("en"));
+      v.lang.startsWith("en") &&
+      (
+        v.name.includes("Natural") ||
+        v.name.includes("Neural") ||
+        v.name.includes("Google") ||
+        v.name.includes("Premium") ||
+        v.name.includes("Aria") ||
+        v.name.includes("Guy") ||
+        v.name.includes("Sonia") ||
+        v.name.includes("Samantha") ||
+        v.name.includes("Daniel")
+      )
+    ) || voices.find(v => v.lang.startsWith("en")) || voices[0];
 
     if (preferredVoice) {
       utterance.voice = preferredVoice;
@@ -379,21 +484,17 @@ export default function InterviewMode() {
   };
 
   // ——— SUBMIT ANSWER ———
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isLoading || !config) return;
+  const submitSpeechAnswer = async (speechText: string) => {
+    if (!speechText.trim() || isLoadingRef.current || !config) return;
 
     stopSpeaking();
     sounds.playSubmitChime();
 
-    if (isListening && recognitionRef.current) {
-      recognitionRef.current.stop();
-      setIsListening(false);
-    }
+    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
 
-    const userMsg = input.trim();
+    const userMsg = speechText.trim();
     setInput("");
-    const newMessages: Message[] = [...messages, { role: "user", content: userMsg }];
+    const newMessages: Message[] = [...messagesRef.current, { role: "user", content: userMsg }];
     setMessages(newMessages);
 
     setShowConfidenceRating(true);
@@ -408,7 +509,7 @@ export default function InterviewMode() {
 
       const aiPrompt = `Conversation History:\n${conversationHistory}\n\nAnalyze the candidate's last response. Reply as the interviewer following your system instructions. If this is a new question, include the question tag.`;
 
-      const stream = generateAIResponseStream(systemPrompt, aiPrompt, 0.7);
+      const stream = generateAIResponseStream(systemPromptRef.current, aiPrompt, 0.7);
 
       let aiResponse = "";
       setMessages(prev => [...prev, { role: "assistant", content: "" }]);
@@ -431,9 +532,16 @@ export default function InterviewMode() {
     } catch (error) {
       console.error(error);
       setMessages(prev => [...prev, { role: "assistant", content: "Error processing response." }]);
+    } finally {
+      setIsLoading(false);
+      setShowConfidenceRating(false);
     }
-    setIsLoading(false);
-    setShowConfidenceRating(false);
+  };
+
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!input.trim() || isLoading) return;
+    await submitSpeechAnswer(input);
   };
 
   // ——— CONFIDENCE RATING ———
@@ -448,26 +556,23 @@ export default function InterviewMode() {
   };
 
   // ——— VOICE (STT) ———
-  const toggleVoice = useCallback(() => {
-    if (config?.voiceMode === "off") return;
-
-    if (isListening) {
-      recognitionRef.current?.stop();
-      setIsListening(false);
-      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-      return;
-    }
-
-    stopSpeaking();
-    sounds.playMicStart();
-
+  const startListening = useCallback(() => {
+    if (typeof window === "undefined") return;
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) return;
+
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch {}
+    }
 
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = "en-US";
+
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
 
     recognition.onresult = (event: any) => {
       let transcript = "";
@@ -476,31 +581,63 @@ export default function InterviewMode() {
       }
       setInput(transcript);
 
-      if (config?.voiceMode === "continuous") {
-        if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-        silenceTimerRef.current = setTimeout(() => {
-          if (transcript.trim()) {
-            const form = document.getElementById("interview-input-form") as HTMLFormElement;
-            form?.requestSubmit();
-          }
-        }, 2200);
-      }
+      // Auto-submit after silence (3.5s)
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = setTimeout(() => {
+        if (transcript.trim() && !isLoadingRef.current) {
+          submitSpeechAnswer(transcript.trim());
+        }
+      }, 3500);
     };
 
-    recognition.onerror = () => setIsListening(false);
+    recognition.onerror = (err: any) => {
+      console.error("Speech recognition error", err);
+    };
+
     recognition.onend = () => {
-      setIsListening(false);
-      if (config?.voiceMode === "continuous" && phase === "live") {
+      // Auto-restart if we are in live phase to keep mic always-on
+      if (phaseRef.current === "live") {
         setTimeout(() => {
-          try { recognition.start(); setIsListening(true); } catch { /* ignore */ }
+          try { recognition.start(); } catch { /* ignore */ }
         }, 300);
+      } else {
+        setIsListening(false);
       }
     };
 
-    recognition.start();
-    recognitionRef.current = recognition;
-    setIsListening(true);
-  }, [isListening, config?.voiceMode, phase]);
+    try {
+      recognition.start();
+      recognitionRef.current = recognition;
+      setIsListening(true);
+    } catch (e) {
+      console.error("Failed to start speech recognition", e);
+    }
+  }, []);
+
+  const toggleVoice = useCallback(() => {
+    if (isListening) {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      setIsListening(false);
+    } else {
+      startListening();
+    }
+  }, [isListening, startListening]);
+
+  // Auto-start listening on live phase
+  useEffect(() => {
+    if (phase === "live") {
+      startListening();
+    } else {
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch {}
+      }
+    }
+    return () => {
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+    };
+  }, [phase, startListening]);
 
   // ——— END INTERVIEW ———
   const handleEndInterview = async () => {
@@ -695,6 +832,49 @@ export default function InterviewMode() {
         />
       )}
 
+      {/* Exit Confirmation Dialog */}
+      {showExitConfirm && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center animate-in fade-in duration-200">
+          <div className="max-w-md w-full mx-4 bg-neutral-900 border border-red-500/30 rounded-3xl p-8 shadow-2xl space-y-5">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-red-500/15 flex items-center justify-center">
+                <AlertTriangle className="w-6 h-6 text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Exit Interview?</h3>
+                <p className="text-xs text-red-400 font-semibold">Strict Proctored Session</p>
+              </div>
+            </div>
+            <p className="text-sm text-neutral-300">
+              Are you sure you want to exit? Leaving the page will terminate your active proctored interview, and you will receive a grade of F.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowExitConfirm(false)}
+                className="flex-1 py-3 rounded-xl bg-white/5 border border-white/10 text-white font-bold text-sm hover:bg-white/10 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  // Enforce exit: stop all streams and tracks, leave fullscreen
+                  if (webcamStream) {
+                    webcamStream.getTracks().forEach(t => t.stop());
+                  }
+                  if (document.fullscreenElement) {
+                    try { document.exitFullscreen(); } catch {}
+                  }
+                  router.push("/");
+                }}
+                className="flex-1 py-3 rounded-xl bg-red-600 text-white font-bold text-sm hover:bg-red-500 transition-all"
+              >
+                Yes, Quit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Webcam PiP */}
       {config?.enableWebcam && webcamStream && (
         <WebcamPip stream={webcamStream} violationCount={violations.length} />
@@ -704,7 +884,7 @@ export default function InterviewMode() {
       <header className="border-b border-white/10 bg-[#090909] py-2.5 sticky top-0 z-20">
         <div className="container mx-auto px-4 md:px-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => router.push("/")} className="text-neutral-400 hover:text-white w-8 h-8">
+            <Button variant="ghost" size="icon" onClick={() => { if (phase === "live") { setShowExitConfirm(true); } else { router.push("/"); } }} className="text-neutral-400 hover:text-white w-8 h-8">
               <ArrowLeft className="w-4 h-4" />
             </Button>
             <div>
@@ -973,39 +1153,63 @@ export default function InterviewMode() {
 
         {/* Code Scratchpad Panel */}
         {scratchpadOpen && (
-          <aside className="h-1/2 md:h-full md:w-1/2 border-t md:border-t-0 md:border-l border-white/10 bg-[#0a0a0a] flex flex-col" data-scratchpad>
+          <aside className="h-1/2 md:h-full md:w-1/2 border-t md:border-t-0 md:border-l border-white/10 bg-[#0d0e15] flex flex-col" data-scratchpad>
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/10 bg-white/[0.02]">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-neutral-400 uppercase tracking-widest flex items-center gap-1.5">
                   <Code2 className="w-3.5 h-3.5 text-violet-400" /> Code Scratchpad
                 </span>
                 <button
-                  onClick={handleRunCode}
-                  disabled={isExecuting}
-                  className="px-2.5 py-1 rounded-md bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/30 text-[11px] font-bold flex items-center gap-1 transition-all"
+                  onClick={handleSubmitCodeForReview}
+                  disabled={isLoading || isExecuting}
+                  className="px-3 py-1 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-[11px] font-bold flex items-center gap-1.5 transition-all shadow-md shadow-violet-500/20 active:scale-95 disabled:opacity-50"
                 >
-                  <Play className="w-3 h-3 fill-current" /> Run Code
+                  <Sparkles className="w-3.5 h-3.5 animate-pulse" /> Submit Code for Review
                 </button>
               </div>
               <Button variant="ghost" size="icon" onClick={() => setScratchpadOpen(false)} className="text-neutral-400 hover:text-white w-7 h-7">
                 <X className="w-4 h-4" />
               </Button>
             </div>
-            <textarea
-              value={scratchpadCode}
-              onChange={(e) => setScratchpadCode(e.target.value)}
-              className="flex-1 bg-transparent text-sm text-neutral-200 font-mono p-4 resize-none focus:outline-none placeholder:text-neutral-600 custom-scrollbar"
-              placeholder="// Write your solution here..."
-              spellCheck={false}
-              data-scratchpad
-            />
+
+            {/* Editor Container with Syntax Highlighting Overlay */}
+            <div className="flex-1 relative font-mono text-sm overflow-hidden bg-[#0a0a0f]">
+              {/* Highlighted pre rendering beneath the textarea */}
+              <pre className="absolute inset-0 p-4 pointer-events-none whitespace-pre-wrap break-all overflow-y-auto custom-scrollbar select-none z-0" aria-hidden="true">
+                <code>
+                  {tokenise(scratchpadCode).map((t, idx) => {
+                    let className = "text-neutral-300";
+                    if (t.type === "keyword") className = "text-pink-400 font-semibold";
+                    else if (t.type === "builtin") className = "text-cyan-400";
+                    else if (t.type === "string") className = "text-emerald-400 font-medium";
+                    else if (t.type === "comment") className = "text-neutral-500 italic";
+                    else if (t.type === "number") className = "text-amber-400";
+                    else if (t.type === "function") className = "text-yellow-400";
+                    else if (t.type === "operator") className = "text-indigo-400";
+                    return <span key={idx} className={className}>{t.value}</span>;
+                  })}
+                </code>
+              </pre>
+
+              {/* Overlay textarea: transparent text, visible caret */}
+              <textarea
+                value={scratchpadCode}
+                onChange={(e) => setScratchpadCode(e.target.value)}
+                className="absolute inset-0 w-full h-full bg-transparent text-transparent caret-white font-mono p-4 resize-none focus:outline-none placeholder:text-neutral-700 custom-scrollbar z-10 whitespace-pre-wrap break-all"
+                placeholder="// Write your solution here..."
+                spellCheck={false}
+                data-scratchpad
+              />
+            </div>
+
+            {/* AI Code Review Panel (replaces normal execution output) */}
             {executionOutput !== null && (
-              <div className="border-t border-white/10 bg-black/80 p-3 font-mono text-xs max-h-40 overflow-y-auto custom-scrollbar">
-                <div className="flex items-center justify-between text-[10px] text-neutral-500 uppercase tracking-wider mb-1 font-bold">
-                  <span>Execution Output</span>
-                  <button onClick={() => setExecutionOutput(null)} className="hover:text-white">Clear</button>
+              <div className="border-t border-white/10 bg-black/90 p-4 font-mono text-xs max-h-48 overflow-y-auto custom-scrollbar">
+                <div className="flex items-center justify-between text-[10px] text-neutral-400 uppercase tracking-wider mb-2 font-bold border-b border-white/5 pb-1">
+                  <span className="flex items-center gap-1"><Sparkles className="w-3 h-3 text-violet-400" /> AI Review Feedback</span>
+                  <button onClick={() => setExecutionOutput(null)} className="hover:text-white transition-colors">Clear</button>
                 </div>
-                <pre className="text-emerald-400 whitespace-pre-wrap leading-relaxed">{executionOutput}</pre>
+                <pre className="text-violet-300 whitespace-pre-wrap leading-relaxed font-sans text-xs">{executionOutput}</pre>
               </div>
             )}
           </aside>
@@ -1033,57 +1237,66 @@ export default function InterviewMode() {
         </div>
       )}
 
-      {/* Input Dock Bar */}
-      <form
-        id="interview-input-form"
-        onSubmit={handleSubmit}
-        className="px-4 md:px-8 py-3 border-t border-white/10 bg-[#090909] flex items-center gap-3 shrink-0"
-      >
-        {/* Voice Microphone Controls */}
-        {config?.voiceMode !== "off" && (
-          <div className="flex items-center gap-2 shrink-0">
-            <Button
-              type="button"
-              size="icon"
-              onClick={toggleVoice}
-              className={cn(
-                "h-12 w-12 rounded-2xl shrink-0 transition-all shadow-lg",
-                isListening
-                  ? "bg-emerald-500 text-white shadow-emerald-500/30 scale-105"
-                  : "bg-white/5 border border-white/10 text-neutral-400 hover:text-white"
-              )}
-            >
-              {isListening ? <Mic className="w-5 h-5 animate-pulse" /> : <MicOff className="w-5 h-5" />}
-            </Button>
-            {isListening && (
-              <VoiceWaveform isActive={isListening} color="#10b981" className="shrink-0" />
+      {/* Voice-Only Input Control Panel */}
+      <div className="px-4 md:px-8 py-4 border-t border-white/10 bg-[#090909] flex flex-col md:flex-row items-center justify-between gap-4 shrink-0">
+        {/* Left Status Indicator */}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={toggleVoice}
+            className={cn(
+              "h-10 w-10 rounded-2xl flex items-center justify-center shrink-0 shadow-lg transition-all hover:scale-105 active:scale-95",
+              isListening
+                ? "bg-emerald-500/20 border border-emerald-500/30 text-emerald-400"
+                : "bg-red-500/20 border border-red-500/30 text-red-400"
             )}
+            title={isListening ? "Pause microphone" : "Activate microphone"}
+          >
+            {isListening ? <Mic className="w-5 h-5 animate-pulse" /> : <MicOff className="w-5 h-5" />}
+          </button>
+          <div className="text-left">
+            <span className={cn(
+              "text-xs font-bold block",
+              isListening ? "text-emerald-400" : "text-red-400"
+            )}>
+              {isListening ? "Microphone Always Active & Listening" : "Microphone Paused / Inactive"}
+            </span>
+            <p className="text-[10px] text-neutral-400 leading-tight">
+              {isListening ? "Start speaking your answer. It will auto-submit after 3.5s of silence." : "Please click mic icon to restart."}
+            </p>
           </div>
-        )}
+        </div>
 
-        <Input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder={
-            config?.voiceMode === "continuous" && isListening
-              ? "Listening to your response... (auto-submits when quiet)"
-              : config?.voiceMode === "push-to-talk"
-                ? "Press mic button to speak, or type your answer..."
-                : "Type your answer..."
-          }
-          className="bg-neutral-950 border-white/10 focus-visible:ring-1 focus-visible:ring-red-500 text-sm h-12 flex-1 rounded-2xl px-4"
-          disabled={isLoading}
-        />
+        {/* Center Scrolling Waveform or Live Transcribing Caption */}
+        <div className="flex-1 max-w-xl w-full px-4 py-2.5 rounded-xl bg-black/40 border border-white/5 min-h-[44px] flex items-center gap-2">
+          {isListening ? (
+            input.trim() ? (
+              <span className="text-xs font-mono text-emerald-300 animate-pulse line-clamp-1 italic">
+                "{input}"
+              </span>
+            ) : (
+              <div className="flex items-center gap-2 text-neutral-500 text-xs italic">
+                <VoiceWaveform isActive={isListening} color="#10b981" className="w-6 h-4 shrink-0" />
+                <span>Speak now... (Say your answer out loud)</span>
+              </div>
+            )
+          ) : (
+            <span className="text-neutral-500 text-xs italic">Microphone is offline. Click mic button to restart...</span>
+          )}
+        </div>
 
-        <Button
-          type="submit"
-          size="icon"
-          disabled={!input.trim() || isLoading}
-          className="h-12 w-12 rounded-2xl bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white shadow-lg shadow-red-500/20 shrink-0 transition-all active:scale-95"
-        >
-          <Send className="w-4 h-4" />
-        </Button>
-      </form>
+        {/* Right Action buttons (manual submit or restart mic) */}
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            type="button"
+            onClick={() => submitSpeechAnswer(input)}
+            disabled={!input.trim() || isLoading}
+            className="bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-bold text-xs px-6 h-11 rounded-xl flex items-center gap-1.5 transition-all shadow-md active:scale-[0.98] disabled:opacity-50"
+          >
+            <Send className="w-4 h-4" /> Submit Answer
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
