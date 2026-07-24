@@ -649,3 +649,30 @@ export const DOMAIN_OPTIONS = [
         exams: ['BTech - CS/IT', 'BTech - Core']
     }
 ];
+
+// ——— AI Daily Plan Generator ———
+
+export async function generateDailyPlan(
+    goals: { title: string; completed: boolean; deadline?: string }[],
+    profile: TutorProfile,
+    student: StudentContext
+): Promise<string> {
+    const prompt = `Create a crisp, actionable study plan for today for ${student.name}.
+Student Goals: ${JSON.stringify(goals)}
+Streak: ${student.streak || 0} days.
+
+Keep it structured in Markdown with 3 key focus areas for today, time estimates, and an encouraging closing message from ${profile.tutor_name || 'Orbit'}.`;
+
+    try {
+        return await generateAIResponse("You are a structured AI study planner.", prompt, 0.5);
+    } catch {
+        return `### 🎯 Today's Action Plan for ${student.name}
+1. **Core Concept Review (45m)** — Deep dive into active topics
+2. **Practice & Problem Solving (60m)** — Complete 3 challenge problems
+3. **Revision & Quiz (15m)** — Take a quick AI Quiz to lock in knowledge
+
+Keep up the strong momentum! 🚀`;
+    }
+}
+
+

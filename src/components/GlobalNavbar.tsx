@@ -9,7 +9,7 @@ export function GlobalNavbar({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   // Hide the floating command dock on auth routes, admin routes, and immersive pages
-  const hiddenRoutes = ['/auth', '/banned', '/maintenance', '/admin', '/subadmin', '/exam', '/interview', '/code', '/debate', '/concept-graph'];
+  const hiddenRoutes = ['/auth', '/banned', '/maintenance', '/admin', '/subadmin', '/exam', '/interview', '/code', '/debate', '/concept-graph', '/ai-tutor'];
   const isHiddenRoute = !pathname || hiddenRoutes.some(route => pathname.startsWith(route));
 
   return (

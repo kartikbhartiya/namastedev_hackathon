@@ -39,6 +39,8 @@ export interface AuthContextType {
   resetPassword: (email: string) => Promise<void>;
   refreshProfile: () => Promise<void>;
   updateUserStats: (stats: Partial<UserProfile>) => Promise<void>;
+  updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
+  updatePassword: (password: string) => Promise<void>;
   demoSignIn: () => Promise<void>;
 }
 
@@ -59,11 +61,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(currentSession.user);
         
         // Fetch profile
-        const { data: profileData } = await supabase
+        let { data: profileData } = await supabase
           .from("users")
           .select("*")
           .eq("id", currentSession.user.id)
-          .single();
+          .maybeSingle();
+
+        // Automatic fallback profile creation if user exists in auth but not in users table
+        if (!profileData) {
+          const newProfile: UserProfile = {
+            id: currentSession.user.id,
+            email: currentSession.user.email ?? null,
+            name: currentSession.user.user_metadata?.full_name || currentSession.user.user_metadata?.name || currentSession.user.email?.split("@")[0] || "Student Scholar",
+            photo_url: currentSession.user.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${currentSession.user.email}`,
+            role: "user",
+            study_streak: 1,
+            xp: 10,
+            course: "btech",
+            earned_badge_ids: [],
+            has_seen_onboarding: false
+          };
+          const { data: createdProfile, error } = await supabase.from("users").upsert(newProfile).select().maybeSingle();
+          if (!error && createdProfile) {
+            profileData = createdProfile;
+          } else {
+            profileData = newProfile;
+          }
+        }
         
         setProfile(profileData);
         setAuthState("AUTHENTICATED_READY");
@@ -88,11 +112,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (currentSession) {
         setUser(currentSession.user);
         setSession(currentSession);
-        const { data: profileData } = await supabase
+        let { data: profileData } = await supabase
           .from("users")
           .select("*")
           .eq("id", currentSession.user.id)
-          .single();
+          .maybeSingle();
+
+        if (!profileData) {
+          const newProfile: UserProfile = {
+            id: currentSession.user.id,
+            email: currentSession.user.email ?? null,
+            name: currentSession.user.user_metadata?.full_name || currentSession.user.user_metadata?.name || currentSession.user.email?.split("@")[0] || "Student Scholar",
+            photo_url: currentSession.user.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${currentSession.user.email}`,
+            role: "user",
+            study_streak: 1,
+            xp: 10,
+            course: "btech",
+            earned_badge_ids: [],
+            has_seen_onboarding: false
+          };
+          await supabase.from("users").upsert(newProfile);
+          profileData = newProfile;
+        }
+
         setProfile(profileData);
         setAuthState("AUTHENTICATED_READY");
       } else {
@@ -133,7 +175,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       if (error) throw error;
       
-      // data.user can be null if email confirmation is required
       if (data.user) {
         const profileInfo: UserProfile = {
           id: data.user.id,
@@ -147,7 +188,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           earned_badge_ids: [],
           has_seen_onboarding: false
         };
-        await supabase.from("users").insert(profileInfo);
+        await supabase.from("users").upsert(profileInfo);
       }
       
       toast.success("Account created successfully!");
@@ -178,23 +219,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const handleResetPassword = async (email: string) => {
-    toast.success("Password reset instructions sent to your email!");
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth?reset=true`
+      });
+      if (error) throw error;
+      toast.success("Password reset instructions sent to your email!");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to send reset email");
+    }
+  };
+
+  const updateProfile = async (updates: Partial<UserProfile>) => {
+    if (!profile && !user) return;
+    const userId = profile?.id || user?.id;
+    try {
+      const updated = { ...profile, ...updates, id: userId };
+      const { data, error } = await supabase.from("users").upsert(updated).select().single();
+      if (error) throw error;
+      setProfile(data || updated);
+      toast.success("Profile updated successfully!");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update profile");
+      throw err;
+    }
+  };
+
+  const updatePassword = async (password: string) => {
+    try {
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) throw error;
+      toast.success("Password updated successfully!");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update password");
+      throw err;
+    }
   };
 
   const updateUserStats = async (stats: Partial<UserProfile>) => {
-    if (!profile) return;
-    try {
-      const updatedProfile = { ...profile, ...stats };
-      await supabase.from("users").update(updatedProfile).eq("id", profile.id);
-      setProfile(updatedProfile);
-    } catch (err) {
-      console.error("Failed to update user stats:", err);
-    }
+    await updateProfile(stats);
   };
 
   const demoSignIn = async () => {
     setLoading(true);
-    // Force a mock user state so judges can bypass authentication instantly
     setUser({ id: "demo-judge", email: "judge@orbit.com" });
     setSession({ user: { id: "demo-judge" } });
     setProfile({
@@ -234,6 +301,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         resetPassword: handleResetPassword,
         refreshProfile,
         updateUserStats,
+        updateProfile,
+        updatePassword,
         demoSignIn
       }}
     >

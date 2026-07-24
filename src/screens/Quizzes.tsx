@@ -445,16 +445,19 @@ export function Quizzes() {
         <main className="container mx-auto px-6 py-8 max-w-3xl relative z-10">
           <Progress value={progress} className="h-2 mb-8 rounded-full bg-white/5" />
 
-          <Card className="rounded-[2rem] border border-white/[0.06] shadow-2xl bg-card/50 backdrop-blur-xl">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-xl font-bold leading-relaxed">{currentQuestion?.question}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {currentQuestion?.options.map((option, i) => {
-                const isSelected = selectedAnswers[currentQuestionIndex] === i;
-                const isPracticeMode = activeQuiz.mode === 'practice' || !activeQuiz.mode;
-                const hasAnswered = selectedAnswers[currentQuestionIndex] !== null;
-                const isCorrect = i === currentQuestion.correctIndex;
+          {(() => {
+            const isPracticeMode = activeQuiz.mode === 'practice' || !activeQuiz.mode;
+            const hasAnswered = selectedAnswers[currentQuestionIndex] !== null;
+
+            return (
+              <Card className="rounded-[2rem] border border-white/[0.06] shadow-2xl bg-card/50 backdrop-blur-xl">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-xl font-bold leading-relaxed">{currentQuestion?.question}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {currentQuestion?.options.map((option, i) => {
+                    const isSelected = selectedAnswers[currentQuestionIndex] === i;
+                    const isCorrect = i === currentQuestion.correctIndex;
 
                 let btnStyle = "bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.05] text-neutral-300";
                 let iconStyle = "bg-white/10 text-white";
@@ -544,7 +547,9 @@ export function Quizzes() {
                 </div>
               )}
             </CardContent>
-          </Card>
+              </Card>
+            );
+          })()}
 
           <div className="flex justify-between mt-6">
             <Button

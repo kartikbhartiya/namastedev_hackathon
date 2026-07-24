@@ -12,6 +12,7 @@ import {
   Swords,
   ShieldAlert,
   Home,
+  Trophy,
   type LucideIcon
 } from "lucide-react";
 
@@ -30,6 +31,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "code", label: "Code Tracer", icon: Code2, href: "/code" },
   { id: "exam", label: "Exam Hall", icon: ShieldCheck, href: "/exam" },
   { id: "interview", label: "AI Interview", icon: ShieldAlert, href: "/interview" },
+  { id: "leaderboard", label: "Leaderboard", icon: Trophy, href: "/leaderboard" },
 ];
 
 interface PillNavbarProps {
@@ -43,27 +45,27 @@ export function PillNavbar({ avatarUrl, avatarFallback }: PillNavbarProps) {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed top-6 inset-x-0 z-50 flex justify-center px-4 pointer-events-none select-none">
-      <div className="mac-command-dock pointer-events-auto flex items-center gap-4 rounded-full px-5 py-2.5 transition-all duration-300">
+    <nav className="fixed top-3 md:top-6 inset-x-0 z-50 flex justify-center px-2 md:px-4 pointer-events-none select-none">
+      <div className="mac-command-dock pointer-events-auto flex items-center gap-1.5 md:gap-4 rounded-full px-2.5 py-1.5 md:px-5 md:py-2.5 transition-all duration-300 max-w-[calc(100vw-16px)] md:max-w-none shadow-2xl">
         
         {/* Core Logo */}
         <button
           onClick={() => router.push("/")}
-          className="flex items-center justify-center p-2 rounded-full hover:bg-white/5 transition-colors group relative shrink-0"
+          className="flex items-center justify-center p-1.5 md:p-2 rounded-full hover:bg-white/5 transition-colors group relative shrink-0"
         >
-          <EclixLogo className="h-5 w-5 text-white transition-transform duration-200 group-hover:scale-105" />
+          <EclixLogo className="h-4 w-4 md:h-5 md:w-5 text-white transition-transform duration-200 group-hover:scale-105" />
           
           {/* macOS Dock Tooltip */}
-          <span className="absolute bottom-[-45px] left-1/2 -translate-x-1/2 bg-neutral-950 border border-white/5 text-[10px] font-bold text-white px-2.5 py-1 rounded-md opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap shadow-2xl tracking-wider">
+          <span className="hidden md:block absolute bottom-[-45px] left-1/2 -translate-x-1/2 bg-neutral-950 border border-white/5 text-[10px] font-bold text-white px-2.5 py-1 rounded-md opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap shadow-2xl tracking-wider">
             ORBIT
           </span>
         </button>
 
         {/* Divider */}
-        <div className="w-[1px] h-6 bg-white/10 shrink-0" />
+        <div className="w-[1px] h-4 md:h-6 bg-white/10 shrink-0" />
 
         {/* Middle Navigation Group */}
-        <div className="flex items-center gap-1 overflow-x-auto max-w-[calc(100vw-140px)] md:max-w-none no-scrollbar">
+        <div className="flex items-center gap-0.5 md:gap-1 overflow-x-auto no-scrollbar py-0.5">
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
@@ -91,13 +93,13 @@ export function PillNavbar({ avatarUrl, avatarFallback }: PillNavbarProps) {
         </div>
 
         {/* Divider */}
-        <div className="w-[1px] h-6 bg-white/10 shrink-0" />
+        <div className="w-[1px] h-5 md:h-6 bg-white/10 shrink-0" />
 
         {/* Profile Avatar */}
         <div className="relative group shrink-0">
           <Avatar
             onClick={() => router.push("/profile")}
-            className="cursor-pointer h-8 w-8 border border-white/10 hover:border-white/20 transition-all hover:scale-105"
+            className="cursor-pointer h-7 w-7 md:h-8 md:w-8 border border-white/10 hover:border-white/20 transition-all hover:scale-105"
           >
             <AvatarImage src={avatarUrl || ""} className="object-cover" referrerPolicy="no-referrer" />
             <AvatarFallback className="bg-neutral-950 text-white font-bold text-xs">
@@ -105,7 +107,7 @@ export function PillNavbar({ avatarUrl, avatarFallback }: PillNavbarProps) {
             </AvatarFallback>
           </Avatar>
           
-          <span className="absolute bottom-[-45px] left-1/2 -translate-x-1/2 bg-neutral-950 border border-white/5 text-[10px] font-bold text-white px-2.5 py-1 rounded-md opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap shadow-2xl tracking-wider">
+          <span className="hidden md:block absolute bottom-[-45px] left-1/2 -translate-x-1/2 bg-neutral-950 border border-white/5 text-[10px] font-bold text-white px-2.5 py-1 rounded-md opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap shadow-2xl tracking-wider">
             SETTINGS
           </span>
         </div>

@@ -1,6 +1,6 @@
 "use client";
 import { cn } from "@/lib/utils";
-import { MessageSquare, Eye, GitBranch, Calendar, HelpCircle, Video, ChevronDown, Lightbulb } from "lucide-react";
+import { MessageSquare, Eye, GitBranch, Calendar, HelpCircle, Video, ChevronDown, Lightbulb, Bug } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -8,7 +8,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-export type TutorMode = "text" | "doubt-solver" | "visualization" | "mindmap" | "studyplan" | "quiz" | "video";
+export type TutorMode = "text" | "doubt-solver" | "debugger" | "visualization" | "mindmap" | "studyplan" | "quiz" | "video";
 
 interface ModeSelectorProps {
     activeMode: TutorMode;
@@ -18,6 +18,7 @@ interface ModeSelectorProps {
 const MODES = [
     { value: "text", label: "Chat", icon: MessageSquare, desc: "Text explanations" },
     { value: "doubt-solver", label: "Doubt Solver", icon: Lightbulb, desc: "Step-by-step solutions with files" },
+    { value: "debugger", label: "Code Debugger", icon: Bug, desc: "Socratic step-by-step debugging" },
     { value: "visualization", label: "Interactive Sim", icon: Eye, desc: "Interactive simulations" },
     { value: "mindmap", label: "Mind Map", icon: GitBranch, desc: "Concept maps" },
     { value: "studyplan", label: "Study Plan", icon: Calendar, desc: "AI study plans" },

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/supabase";
+import { cn } from "@/lib/utils";
 import {
   Bot,
   Network,
@@ -40,16 +41,15 @@ function MetricSparkline() {
   );
 }
 
-// Quiet, elegant metric card
 function MetricWidget({ label, value, trend, icon: Icon }: any) {
   return (
-    <div className="w-[180px] p-[24px] rounded-xl bg-[#0b0b0b] border border-white/5 flex flex-col justify-between select-none">
+    <div className="flex-1 min-w-[140px] sm:min-w-[180px] p-5 sm:p-[24px] rounded-xl bg-[#0b0b0b] border border-white/5 flex flex-col justify-between select-none">
       <div className="flex justify-between items-center text-[#707070] mb-3">
         <span className="text-[11px] font-semibold uppercase tracking-wider">{label}</span>
         <Icon className="h-4 w-4" />
       </div>
       <div>
-        <h4 className="text-[32px] font-bold text-white tracking-tight leading-none mb-2">
+        <h4 className="text-[28px] sm:text-[32px] font-bold text-white tracking-tight leading-none mb-2">
           {value}
         </h4>
         <div className="flex items-center justify-between text-[11px] text-[#9B9B9B]">
@@ -107,6 +107,42 @@ function EditorialCard({ item, onClick }: any) {
           <Clock className="h-3 w-3" /> {item.estTime || "15 mins"}
         </span>
         <span>{item.difficulty || "medium"}</span>
+      </div>
+    </div>
+  );
+}
+
+// Advanced Feature: Activity Heatmap
+function ActivityHeatmap() {
+  const weeks = 20; // past 20 weeks
+  const days = 7;
+  // Generate mock intensity data for the heatmap
+  const getIntensity = () => Math.random() > 0.6 ? Math.floor(Math.random() * 4) + 1 : 0;
+  
+  return (
+    <div className="w-full overflow-x-auto pb-4 custom-scrollbar">
+      <div className="flex gap-1.5 min-w-max">
+        {Array.from({ length: weeks }).map((_, wIndex) => (
+          <div key={wIndex} className="flex flex-col gap-1.5">
+            {Array.from({ length: days }).map((_, dIndex) => {
+              const intensity = getIntensity();
+              return (
+                <div 
+                  key={dIndex}
+                  className={cn(
+                    "w-3.5 h-3.5 rounded-sm transition-colors duration-300",
+                    intensity === 0 ? "bg-white/5" :
+                    intensity === 1 ? "bg-emerald-500/20" :
+                    intensity === 2 ? "bg-emerald-500/40" :
+                    intensity === 3 ? "bg-emerald-500/60" :
+                    "bg-emerald-500"
+                  )}
+                  title={`Activity level: ${intensity}`}
+                />
+              );
+            })}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -172,7 +208,7 @@ export default function Dashboard() {
   const activeCourseLabel = profile?.course ? profile.course.toUpperCase() : "BTECH";
 
   return (
-    <div className="w-full max-w-5xl mx-auto space-y-24 pt-32 px-6 pb-16 vignette-bg select-none">
+    <div className="w-full max-w-5xl mx-auto space-y-16 sm:space-y-24 pt-24 sm:pt-32 px-4 sm:px-6 pb-16 vignette-bg select-none">
       
       {/* 1. HERO SPLIT SECTION - High contrast & catchy */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-10 items-stretch">
@@ -304,16 +340,36 @@ export default function Dashboard() {
         </div>
       </section>
 
-      {/* 4. PROGRESS OVERVIEW - Hooked to db */}
+      {/* 4. PROGRESS OVERVIEW & HEATMAP */}
       <section className="space-y-4">
         <span className="text-[11px] font-bold uppercase tracking-widest text-[#707070] block">
           Progress Overview
         </span>
-        <div className="flex flex-wrap gap-6">
+        <div className="flex flex-wrap gap-4 sm:gap-6">
           <MetricWidget label="Streak" value={`${profile?.study_streak || 0} days`} trend="Active Streak" icon={Flame} />
           <MetricWidget label="Orbit XP" value={`${profile?.xp || 0}`} trend="Accumulated" icon={Trophy} />
           <MetricWidget label="Achievements" value={`${profile?.earned_badge_ids?.length || 0} unlocked`} trend="Milestones" icon={Award} />
           <MetricWidget label="Focus Time" value={`${((profile?.total_uptime || 0) / 60).toFixed(1)}h`} trend="Focus session" icon={Clock} />
+        </div>
+        
+        {/* Heatmap Section */}
+        <div className="pt-4">
+          <div className="p-[28px] rounded-xl bg-[#0b0b0b] border border-white/5 space-y-4">
+            <div className="flex justify-between items-center text-[#707070] mb-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wider">Activity History</span>
+              <Activity className="h-4 w-4" />
+            </div>
+            <ActivityHeatmap />
+            <div className="flex justify-end items-center gap-2 text-[10px] text-[#707070]">
+              <span>Less</span>
+              <div className="w-2.5 h-2.5 rounded-sm bg-white/5" />
+              <div className="w-2.5 h-2.5 rounded-sm bg-emerald-500/20" />
+              <div className="w-2.5 h-2.5 rounded-sm bg-emerald-500/40" />
+              <div className="w-2.5 h-2.5 rounded-sm bg-emerald-500/60" />
+              <div className="w-2.5 h-2.5 rounded-sm bg-emerald-500" />
+              <span>More</span>
+            </div>
+          </div>
         </div>
       </section>
 

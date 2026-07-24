@@ -9,6 +9,8 @@ const font = Plus_Jakarta_Sans({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Orbit — AI Tutor & Assessments",
   description: "Dynamic AI Learning & Adaptive Assessments Dashboard built for the Hackathon.",
+  manifest: "/manifest.json",
+  themeColor: "#040404",
 };
 
 export default function RootLayout({

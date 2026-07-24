@@ -1,0 +1,17 @@
+{
+  "name": "Orbit Study OS - Computer Science Workspace",
+  "short_name": "Orbit OS",
+  "description": "An intelligent operating workspace for computer science, AI tutoring, and proctored interviews.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#040404",
+  "theme_color": "#040404",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

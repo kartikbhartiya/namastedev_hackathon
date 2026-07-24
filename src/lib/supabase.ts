@@ -64,5 +64,19 @@ export const db = {
     deleteBySession: async (sessionId: string) => {
       await supabase.from("ai_messages").delete().eq("session_id", sessionId);
     }
+  },
+  interviews: {
+    create: async (userId: string, roleTarget: string, seniority: string) => {
+      const { data } = await supabase.from("interviews").insert({ user_id: userId, role_target: roleTarget, seniority }).select().single();
+      return data;
+    },
+    saveEvaluation: async (interviewId: string, score: number, feedbackJson: any, transcript: any) => {
+      const { data } = await supabase.from("interviews").update({ score, feedback_json: feedbackJson, transcript, completed_at: new Date().toISOString() }).eq("id", interviewId).select().single();
+      return data;
+    },
+    getByUser: async (userId: string, limit = 20) => {
+      const { data } = await supabase.from("interviews").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(limit);
+      return data || [];
+    }
   }
 };
