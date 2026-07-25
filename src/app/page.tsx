@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/supabase";
+import { StudyHeatmap } from "@/components/dashboard/StudyHeatmap";
 import {
   Bot,
   Network,
@@ -43,13 +44,13 @@ function MetricSparkline() {
 // Quiet, elegant metric card
 function MetricWidget({ label, value, trend, icon: Icon }: any) {
   return (
-    <div className="w-full sm:w-[180px] p-4 sm:p-[24px] rounded-xl bg-[#0b0b0b] border border-white/5 flex flex-col justify-between select-none">
-      <div className="flex justify-between items-center text-[#707070] mb-3">
+    <div className="w-full p-4 sm:p-6 rounded-xl bg-[#0b0b0b] border border-white/5 hover:bg-[#101010] hover:border-white/10 transition-all duration-200 flex flex-col justify-between select-none group">
+      <div className="flex justify-between items-center text-[#707070] group-hover:text-neutral-300 transition-colors mb-3">
         <span className="text-[11px] font-semibold uppercase tracking-wider">{label}</span>
-        <Icon className="h-4 w-4" />
+        <Icon className="h-4 w-4 text-[#ff6c37]" />
       </div>
       <div>
-        <h4 className="text-[32px] font-bold text-white tracking-tight leading-none mb-2">
+        <h4 className="text-[28px] sm:text-[32px] font-bold text-white tracking-tight leading-none mb-2">
           {value}
         </h4>
         <div className="flex items-center justify-between text-[11px] text-[#9B9B9B]">
@@ -305,16 +306,17 @@ export default function Dashboard() {
       </section>
 
       {/* 4. PROGRESS OVERVIEW - Hooked to db */}
-      <section className="space-y-4">
+      <section className="space-y-6">
         <span className="text-[11px] font-bold uppercase tracking-widest text-[#707070] block">
-          Progress Overview
+          Progress & Learning Activity
         </span>
-        <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-4 sm:gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <MetricWidget label="Streak" value={`${profile?.study_streak || 0} days`} trend="Active Streak" icon={Flame} />
           <MetricWidget label="Orbit XP" value={`${profile?.xp || 0}`} trend="Accumulated" icon={Trophy} />
           <MetricWidget label="Achievements" value={`${profile?.earned_badge_ids?.length || 0} unlocked`} trend="Milestones" icon={Award} />
           <MetricWidget label="Focus Time" value={`${((profile?.total_uptime || 0) / 60).toFixed(1)}h`} trend="Focus session" icon={Clock} />
         </div>
+        <StudyHeatmap streak={profile?.study_streak || 1} />
       </section>
 
       {/* 5. MODULAR SECTIONS */}
