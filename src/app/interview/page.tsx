@@ -704,7 +704,8 @@ export default function InterviewMode() {
     };
 
     recognition.onerror = (err: any) => {
-      console.error("Speech recognition error", err);
+      // Avoid console.error to prevent Next.js 15 dev overlay from popping up on non-fatal/aborted speech events
+      console.warn("Speech recognition warning/error", err.error || err);
     };
 
     recognition.onend = () => {
@@ -723,7 +724,7 @@ export default function InterviewMode() {
       recognitionRef.current = recognition;
       setIsListening(true);
     } catch (e) {
-      console.error("Failed to start speech recognition", e);
+      console.warn("Failed to start speech recognition", e);
     }
   }, []);
 
