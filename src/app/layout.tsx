@@ -3,6 +3,7 @@ import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import { GlobalNavbar } from "@/components/GlobalNavbar";
+import { FooterWrapper } from "@/components/FooterWrapper";
 
 const font = Plus_Jakarta_Sans({ subsets: ["latin"] });
 
@@ -23,9 +24,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
-      <body className={`${font.className} bg-background text-foreground antialiased selection:bg-primary/20`}>
+      <body className={`${font.className} bg-background text-foreground antialiased selection:bg-primary/20 flex flex-col min-h-screen`}>
         <Providers>
           <GlobalNavbar>{children}</GlobalNavbar>
+          <FooterWrapper />
         </Providers>
       </body>
     </html>
