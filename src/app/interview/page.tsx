@@ -268,6 +268,38 @@ export default function InterviewMode() {
       }, 0);
       return;
     }
+
+    // Enter key auto-indentation and brace expansion
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const lineStart = val.lastIndexOf("\n", start - 1) + 1;
+      const currentLine = val.substring(lineStart, start);
+      const indentMatch = currentLine.match(/^([ \t]*)/);
+      const indent = indentMatch ? indentMatch[1] : "";
+
+      const charBefore = start > 0 ? val[start - 1] : "";
+      const charAfter = start < val.length ? val[start] : "";
+
+      let insertText = "\n" + indent;
+      let cursorOffset = indent.length + 1;
+
+      if ((charBefore === "{" && charAfter === "}") || 
+          (charBefore === "[" && charAfter === "]") || 
+          (charBefore === "(" && charAfter === ")")) {
+        insertText = "\n" + indent + "  \n" + indent;
+        cursorOffset = indent.length + 3;
+      } else if (charBefore === "{" || charBefore === "[" || charBefore === "(" || charBefore === ":") {
+        insertText = "\n" + indent + "  ";
+        cursorOffset = indent.length + 3;
+      }
+
+      const newVal = val.substring(0, start) + insertText + val.substring(end);
+      handleCodeChange(newVal);
+      setTimeout(() => {
+        textarea.selectionStart = textarea.selectionEnd = start + cursorOffset;
+      }, 0);
+      return;
+    }
   };
 
   // Submit code scratchpad to Groq for AI Interviewer review
@@ -560,7 +592,8 @@ export default function InterviewMode() {
     if (ttsMuted || typeof window === "undefined" || !window.speechSynthesis) return;
     window.speechSynthesis.cancel();
 
-    const cleaned = text.replace(/[*#_`\[\]]/g, "").replace(/\[QUESTION[^\]]*\]/g, "");
+    // Strip question and template markup tags before speaking
+    const cleaned = cleanInterviewerMessage(text).replace(/[*#_`\[\]]/g, "");
     const utterance = new SpeechSynthesisUtterance(cleaned);
 
     utterance.rate = voiceSpeed;
@@ -639,6 +672,18 @@ export default function InterviewMode() {
   // ——— ENV CHECK PASSED → LAUNCH LIVE ———
   const handleEnvCheckPassed = useCallback(async () => {
     if (!config) return;
+
+    // Prime the Speech Synthesis engine under the synchronous user click thread
+    // to unlock subsequent async voice prompts (avoiding autoplay blocks).
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      try {
+        const utterance = new SpeechSynthesisUtterance("");
+        window.speechSynthesis.speak(utterance);
+      } catch (e) {
+        console.warn("Failed to prime SpeechSynthesis:", e);
+      }
+    }
+
     const prompt = buildInterviewSystemPrompt(config);
 
     if (config.enableProctoring) {
