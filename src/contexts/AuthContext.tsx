@@ -106,47 +106,66 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    refreshProfile();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: string, currentSession: any) => {
-      if (currentSession) {
-        setUser(currentSession.user);
-        setSession(currentSession);
-        let { data: profileData } = await supabase
-          .from("users")
-          .select("*")
-          .eq("id", currentSession.user.id)
-          .maybeSingle();
-
-        if (!profileData) {
-          const newProfile: UserProfile = {
-            id: currentSession.user.id,
-            email: currentSession.user.email ?? null,
-            name: currentSession.user.user_metadata?.full_name || currentSession.user.user_metadata?.name || currentSession.user.email?.split("@")[0] || "Student Scholar",
-            photo_url: currentSession.user.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${currentSession.user.email}`,
-            role: "user",
-            study_streak: 1,
-            xp: 10,
-            course: "btech",
-            earned_badge_ids: [],
-            has_seen_onboarding: false
-          };
-          await supabase.from("users").upsert(newProfile);
-          profileData = newProfile;
-        }
-
-        setProfile(profileData);
-        setAuthState("AUTHENTICATED_READY");
-      } else {
-        setUser(null);
-        setSession(null);
-        setProfile(null);
-        setAuthState("UNAUTHENTICATED");
-      }
+    try {
+      refreshProfile();
+    } catch (err) {
+      console.error("Failed to refresh profile:", err);
       setLoading(false);
-    });
+    }
 
-    return () => subscription?.unsubscribe();
+    let subscription: any = null;
+    try {
+      const res = supabase.auth.onAuthStateChange(async (event: string, currentSession: any) => {
+        try {
+          if (currentSession) {
+            setUser(currentSession.user);
+            setSession(currentSession);
+            let { data: profileData } = await supabase
+              .from("users")
+              .select("*")
+              .eq("id", currentSession.user.id)
+              .maybeSingle();
+
+            if (!profileData) {
+              const newProfile: UserProfile = {
+                id: currentSession.user.id,
+                email: currentSession.user.email ?? null,
+                name: currentSession.user.user_metadata?.full_name || currentSession.user.user_metadata?.name || currentSession.user.email?.split("@")[0] || "Student Scholar",
+                photo_url: currentSession.user.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${currentSession.user.email}`,
+                role: "user",
+                study_streak: 1,
+                xp: 10,
+                course: "btech",
+                earned_badge_ids: [],
+                has_seen_onboarding: false
+              };
+              await supabase.from("users").upsert(newProfile);
+              profileData = newProfile;
+            }
+
+            setProfile(profileData);
+            setAuthState("AUTHENTICATED_READY");
+          } else {
+            setUser(null);
+            setSession(null);
+            setProfile(null);
+            setAuthState("UNAUTHENTICATED");
+          }
+        } catch (innerErr) {
+          console.error("Error in onAuthStateChange handler:", innerErr);
+        } finally {
+          setLoading(false);
+        }
+      });
+      subscription = res?.data?.subscription;
+    } catch (err) {
+      console.error("Error setting up auth state listener:", err);
+      setLoading(false);
+    }
+
+    return () => {
+      if (subscription) subscription.unsubscribe();
+    };
   }, []);
 
   const handleSignIn = async (email: string, password: string) => {
