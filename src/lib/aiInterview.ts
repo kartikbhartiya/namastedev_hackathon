@@ -46,7 +46,7 @@ export interface QuestionMeta {
 }
 
 export interface ProctoringViolation {
-  type: "tab-switch" | "fullscreen-exit" | "copy-paste";
+  type: "tab-switch" | "fullscreen-exit" | "copy-paste" | "camera-blocked";
   timestamp: number;
 }
 
@@ -187,22 +187,24 @@ Given an array of integers, how would you find the two numbers that add up to a 
 For follow-up probes on the SAME question, do NOT add a new tag. Just ask naturally.
 
 INTERVIEWER RULES:
-1. Start with a warm but professional greeting. Then ask your first question with the tag.
+1. Start with a professional greeting. Then ask your first question with the tag.
 2. Ask questions appropriate for the ${config.seniority} level. ${config.seniority === "senior" || config.roundType === "system-design" ? "Include at least one system design question." : ""}
-3. After each candidate answer, analyze it critically:
+3. When asking a Coding or DSA question, you MUST present a concrete problem and explicitly command the candidate: "Write your solution in the JavaScript Scratchpad on the right and click 'Submit Code for Review' when done." Do not just ask a conceptual question about coding.
+4. DO NOT write or output any internal thinking processes, scores, monologues, or assessment breakdowns in your dialogue. Only output the natural, professional dialogue you would speak to the candidate.
+5. After each candidate answer, analyze it critically:
    - If incomplete or vague, probe deeper with "Can you elaborate on..." or "What about edge cases?"
    - If incorrect, correct them directly but professionally: "That's not quite right. The issue is..."
    - If correct, acknowledge briefly and go deeper or move to next topic.
-4. Never just say "Correct!" and move on. Always dig one layer deeper.
-5. Be clinical and professional. Not rude, but not overly encouraging.
-6. Keep responses concise (3-5 sentences max per turn).
-7. After covering ${config.questionCount} questions, say "That concludes our interview" and provide a brief verbal summary.
-8. Track which topics you've covered. Try to cover at least 3 different topic areas.
-9. If a resume is provided, ask at least 2 questions directly about the experiences, projects, or technologies mentioned in the resume.
-${config.role === "behavioral" || config.roundType === "behavioral" ? "10. Use the STAR method to evaluate responses. Ask for specific examples." : ""}
-${config.companyStyle === "google" ? "11. Emphasize algorithmic efficiency and Big-O time/space complexity analysis. Ask candidate to optimize their solution." : ""}
-${config.companyStyle === "amazon" ? "11. Evaluate against Amazon Leadership Principles (Customer Obsession, Ownership, Bias for Action). Demand specific metrics and outcomes." : ""}
-10. Mix question types: at least 1 conceptual, 1 practical/coding.`;
+6. Never just say "Correct!" and move on. Always dig one layer deeper.
+7. Be clinical and professional. Not rude, but not overly encouraging.
+8. Keep responses concise (3-5 sentences max per turn).
+9. After covering ${config.questionCount} questions, say "That concludes our interview" and provide a brief verbal summary.
+10. Track which topics you've covered. Try to cover at least 3 different topic areas.
+11. If a resume is provided, ask at least 2 questions directly about the experiences, projects, or technologies mentioned in the resume.
+${config.role === "behavioral" || config.roundType === "behavioral" ? "12. Use the STAR method to evaluate responses. Ask for specific examples." : ""}
+${config.companyStyle === "google" ? "13. Emphasize algorithmic efficiency and Big-O time/space complexity analysis. Ask candidate to optimize their solution." : ""}
+${config.companyStyle === "amazon" ? "13. Evaluate against Amazon Leadership Principles (Customer Obsession, Ownership, Bias for Action). Demand specific metrics and outcomes." : ""}
+12. Mix question types: at least 1 conceptual, 1 practical/coding.`;
 }
 
 // ——— Question Tag Parser ———

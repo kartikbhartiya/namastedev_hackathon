@@ -189,6 +189,14 @@ export default function InterviewMode() {
       }
 
       speakText(aiResponse);
+      const lower = aiResponse.toLowerCase();
+      const isConclusion = lower.includes("concludes our interview") || 
+                           lower.includes("concludes the interview") || 
+                           lower.includes("conclusions of our interview") ||
+                           lower.includes("that concludes");
+      if (isConclusion) {
+        setPendingAutoEnd(true);
+      }
       setExecutionOutput(`Reviewed by Interviewer:\n\n${stripQuestionTag(aiResponse)}`);
     } catch (error) {
       console.error(error);
@@ -209,14 +217,15 @@ export default function InterviewMode() {
 
   // ——— Proctoring ———
   const [violations, setViolations] = useState<ProctoringViolation[]>([]);
-  const [warningModal, setWarningModal] = useState<{ type: "tab-switch" | "fullscreen-exit" | "copy-paste" } | null>(null);
+  const [warningModal, setWarningModal] = useState<{ type: "tab-switch" | "fullscreen-exit" | "copy-paste" | "camera-blocked" } | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [webcamStream, setWebcamStream] = useState<MediaStream | null>(null);
 
-  // ——— Report ———
+  // ——— Report & Auto-End ———
   const [scorecard, setScorecard] = useState<InterviewScoreBreakdown | null>(null);
   const [xpClaimed, setXpClaimed] = useState(false);
   const [interviewDbId, setInterviewDbId] = useState<string | null>(null);
+  const [pendingAutoEnd, setPendingAutoEnd] = useState(false);
 
   // ——— Avatar State Computation ———
   const avatarState: AvatarState = isLoading
@@ -350,11 +359,74 @@ export default function InterviewMode() {
     };
   }, [webcamStream]);
 
+  const endInterviewRef = useRef<() => void>(() => {});
+
+  // ——— Proctoring: Webcam Lens Block Detection ———
+  useEffect(() => {
+    if (phase !== "live" || !config?.enableProctoring || !webcamStream) return;
+
+    const video = document.createElement("video");
+    video.srcObject = webcamStream;
+    video.muted = true;
+    video.playsInline = true;
+    video.play().catch(() => {});
+
+    const canvas = document.createElement("canvas");
+    canvas.width = 40;
+    canvas.height = 30;
+    const ctx = canvas.getContext("2d");
+
+    const interval = setInterval(() => {
+      if (!ctx) return;
+      try {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imgData.data;
+
+        // Check if camera is covered (almost entirely black/darkness)
+        let totalBrightness = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i+1];
+          const b = data[i+2];
+          // simple luminosity formula
+          totalBrightness += (r * 0.299 + g * 0.587 + b * 0.114);
+        }
+        const avgBrightness = totalBrightness / (data.length / 4);
+
+        if (avgBrightness < 12) { // lens covered/black
+          sounds.playWarningChime();
+          const newViolation: ProctoringViolation = { type: "camera-blocked", timestamp: Date.now() };
+          setViolations(prev => {
+            const updated = [...prev, newViolation];
+            if (updated.length >= MAX_VIOLATIONS) {
+              endInterviewRef.current();
+            }
+            return updated;
+          });
+          setWarningModal({ type: "camera-blocked" });
+        }
+      } catch (err) {
+        console.error("Camera proctoring error:", err);
+      }
+    }, 4000); // check every 4s
+
+    return () => {
+      clearInterval(interval);
+      video.srcObject = null;
+    };
+  }, [phase, webcamStream, config?.enableProctoring]);
+
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60);
     const sec = s % 60;
     return `${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
   };
+
+  const pendingAutoEndRef = useRef(false);
+  useEffect(() => {
+    pendingAutoEndRef.current = pendingAutoEnd;
+  }, [pendingAutoEnd]);
 
   // ——— TTS Voice Playback with Speed & Voice Tuning ———
   const speakText = useCallback((text: string) => {
@@ -389,11 +461,33 @@ export default function InterviewMode() {
     }
 
     utterance.onstart = () => setIsTTSSpeaking(true);
-    utterance.onend = () => setIsTTSSpeaking(false);
-    utterance.onerror = () => setIsTTSSpeaking(false);
+    utterance.onend = () => {
+      setIsTTSSpeaking(false);
+      if (pendingAutoEndRef.current) {
+        endInterviewRef.current();
+      }
+    };
+    utterance.onerror = () => {
+      setIsTTSSpeaking(false);
+      if (pendingAutoEndRef.current) {
+        endInterviewRef.current();
+      }
+    };
 
     window.speechSynthesis.speak(utterance);
   }, [ttsMuted, voiceSpeed]);
+
+  // Fallback auto-end check when TTS is muted or unsupported
+  useEffect(() => {
+    if (!pendingAutoEnd) return;
+
+    if (ttsMuted || typeof window === "undefined" || !window.speechSynthesis) {
+      const timer = setTimeout(() => {
+        handleEndInterview();
+      }, 3500);
+      return () => clearTimeout(timer);
+    }
+  }, [pendingAutoEnd, ttsMuted]);
 
   const stopSpeaking = () => {
     if (typeof window !== "undefined" && window.speechSynthesis) {
@@ -476,6 +570,14 @@ export default function InterviewMode() {
       }
 
       speakText(aiResponse);
+      const lower = aiResponse.toLowerCase();
+      const isConclusion = lower.includes("concludes our interview") || 
+                           lower.includes("concludes the interview") || 
+                           lower.includes("conclusions of our interview") ||
+                           lower.includes("that concludes");
+      if (isConclusion) {
+        setPendingAutoEnd(true);
+      }
     } catch (error) {
       console.error(error);
       setMessages([{ role: "assistant", content: "Error connecting to the AI interviewer. Please check your API key configuration." }]);
@@ -523,12 +625,23 @@ export default function InterviewMode() {
       }
 
       const qMeta = parseQuestionTag(aiResponse);
+      let nextQuestionCount = questionMetas.length;
       if (qMeta) {
         setQuestionMetas(prev => [...prev, qMeta]);
         setCurrentQuestion(qMeta);
+        nextQuestionCount += 1;
       }
 
       speakText(aiResponse);
+      const lower = aiResponse.toLowerCase();
+      const isConclusion = lower.includes("concludes our interview") || 
+                           lower.includes("concludes the interview") || 
+                           lower.includes("conclusions of our interview") ||
+                           lower.includes("that concludes") ||
+                           (nextQuestionCount >= (config?.questionCount || 5) && lower.includes("conclude"));
+      if (isConclusion) {
+        setPendingAutoEnd(true);
+      }
     } catch (error) {
       console.error(error);
       setMessages(prev => [...prev, { role: "assistant", content: "Error processing response." }]);
@@ -689,6 +802,10 @@ export default function InterviewMode() {
       setPhase("report");
     }
   };
+
+  useEffect(() => {
+    endInterviewRef.current = handleEndInterview;
+  }, [handleEndInterview]);
 
   // ——— XP CLAIM ———
   const handleClaimXP = async () => {

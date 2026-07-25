@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Shield, Camera, Mic, Maximize, AlertTriangle, Eye } from "lucide-react";
 
@@ -99,7 +99,7 @@ export function ProctoringBar({
 // ——— Proctoring Warning Modal ———
 
 interface ProctoringWarningProps {
-  type: "tab-switch" | "fullscreen-exit" | "copy-paste";
+  type: "tab-switch" | "fullscreen-exit" | "copy-paste" | "camera-blocked";
   violationCount: number;
   maxViolations: number;
   onDismiss: () => void;
@@ -119,9 +119,13 @@ export function ProctoringWarning({ type, violationCount, maxViolations, onDismi
       title: "Copy/Paste Blocked",
       body: "Copy and paste is disabled in the interview chat area to maintain integrity.",
     },
+    "camera-blocked": {
+      title: "Camera Feed Blocked",
+      body: "Your camera feed has been blocked or covered. Maintaining active camera coverage is mandatory.",
+    },
   };
 
-  const msg = messages[type];
+  const msg = messages[type] || { title: "Proctoring Violation", body: "Suspicious activity detected." };
   const isFinal = violationCount >= maxViolations - 1;
 
   return (
@@ -172,7 +176,7 @@ export function ProctoringWarning({ type, violationCount, maxViolations, onDismi
   );
 }
 
-// ——— Webcam PiP (Picture-in-Picture) ———
+// ——— Draggable Webcam PiP (Picture-in-Picture) ———
 
 interface WebcamPipProps {
   stream: MediaStream | null;
@@ -181,6 +185,11 @@ interface WebcamPipProps {
 
 export function WebcamPip({ stream, violationCount }: WebcamPipProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({ x: 24, y: 24 }); // offsets from right/bottom
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStart = useRef({ x: 0, y: 0 });
+  const posStart = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
     if (videoRef.current && stream) {
@@ -188,20 +197,62 @@ export function WebcamPip({ stream, violationCount }: WebcamPipProps) {
     }
   }, [stream]);
 
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setIsDragging(true);
+    dragStart.current = { x: e.clientX, y: e.clientY };
+    posStart.current = { x: position.x, y: position.y };
+    e.preventDefault();
+  };
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const dx = e.clientX - dragStart.current.x;
+      const dy = e.clientY - dragStart.current.y;
+      // Draggable coordinates updates
+      setPosition({
+        x: posStart.current.x - dx,
+        y: posStart.current.y - dy
+      });
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isDragging]);
+
   if (!stream) return null;
 
-  const borderColor = violationCount >= 3 ? "border-red-500" : violationCount >= 1 ? "border-amber-500" : "border-emerald-500";
+  const borderColor = violationCount >= 3 ? "border-red-500 animate-pulse" : violationCount >= 1 ? "border-amber-500" : "border-emerald-500";
 
   return (
-    <div className={cn(
-      "fixed bottom-6 right-6 z-30 w-32 h-24 rounded-2xl overflow-hidden border-2 shadow-2xl",
-      borderColor,
-      "bg-black transition-all duration-300"
-    )}>
-      <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
-      <div className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded-md">
+    <div
+      ref={containerRef}
+      onMouseDown={handleMouseDown}
+      style={{
+        bottom: `${position.y}px`,
+        right: `${position.x}px`,
+        cursor: isDragging ? "grabbing" : "grab",
+        touchAction: "none"
+      }}
+      className={cn(
+        "fixed z-50 w-44 h-32 rounded-2xl overflow-hidden border-2 shadow-2xl bg-black select-none transition-shadow",
+        borderColor,
+        isDragging ? "shadow-violet-500/20" : ""
+      )}
+    >
+      <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover pointer-events-none" />
+      <div className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded-md pointer-events-none">
         <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-        <span className="text-[8px] font-bold text-white">LIVE</span>
+        <span className="text-[8px] font-bold text-white">PROCTOR CAM</span>
       </div>
     </div>
   );
