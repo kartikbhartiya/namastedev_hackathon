@@ -33,6 +33,8 @@ import {
   evaluateInterviewSession,
   parseQuestionTag,
   stripQuestionTag,
+  cleanInterviewerMessage,
+  parseTemplates,
   ROLE_OPTIONS,
 } from "@/lib/aiInterview";
 
@@ -148,10 +150,51 @@ export default function InterviewMode() {
   const [scratchpadLang, setScratchpadLang] = useState("javascript");
   const [executionOutput, setExecutionOutput] = useState<string | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [codeTemplates, setCodeTemplates] = useState<Record<string, string>>({});
+  const [languageCodes, setLanguageCodes] = useState<Record<string, string>>({});
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const preRef = useRef<HTMLPreElement>(null);
   const lineGutterRef = useRef<HTMLDivElement>(null);
+
+  const handleCodeChange = (newCode: string) => {
+    setScratchpadCode(newCode);
+    setLanguageCodes(prev => ({
+      ...prev,
+      [scratchpadLang]: newCode
+    }));
+  };
+
+  useEffect(() => {
+    if (languageCodes[scratchpadLang] !== undefined) {
+      setScratchpadCode(languageCodes[scratchpadLang]);
+    } else if (codeTemplates[scratchpadLang]) {
+      setScratchpadCode(codeTemplates[scratchpadLang]);
+    } else {
+      const defaults: Record<string, string> = {
+        javascript: "// Write your JavaScript solution here...\n\n",
+        python: "# Write your Python solution here...\n\n",
+        java: "// Write your Java solution here...\n\n",
+        cpp: "// Write your C++ solution here...\n\n",
+      };
+      setScratchpadCode(defaults[scratchpadLang] || "// Write your solution here...\n\n");
+    }
+  }, [scratchpadLang, codeTemplates]);
+
+  useEffect(() => {
+    setLanguageCodes({});
+    if (codeTemplates[scratchpadLang]) {
+      setScratchpadCode(codeTemplates[scratchpadLang]);
+    } else {
+      const defaults: Record<string, string> = {
+        javascript: "// Write your JavaScript solution here...\n\n",
+        python: "# Write your Python solution here...\n\n",
+        java: "// Write your Java solution here...\n\n",
+        cpp: "// Write your C++ solution here...\n\n",
+      };
+      setScratchpadCode(defaults[scratchpadLang] || "// Write your solution here...\n\n");
+    }
+  }, [codeTemplates]);
 
   const handleScroll = () => {
     if (textareaRef.current && preRef.current) {
@@ -164,17 +207,66 @@ export default function InterviewMode() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const textarea = e.currentTarget;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const val = textarea.value;
+
+    const pairs: Record<string, string> = {
+      "{": "}",
+      "[": "]",
+      "(": ")",
+      '"': '"',
+      "'": "'",
+      "`": "`",
+    };
+
+    // Auto-closing pairs
+    if (pairs[e.key] !== undefined) {
+      e.preventDefault();
+      const closingChar = pairs[e.key];
+      const newVal = val.substring(0, start) + e.key + closingChar + val.substring(end);
+      handleCodeChange(newVal);
+      setTimeout(() => {
+        textarea.selectionStart = textarea.selectionEnd = start + 1;
+      }, 0);
+      return;
+    }
+
+    // Overtyping closing characters
+    const closingChars = ["}", "]", ")", '"', "'", "`"];
+    if (closingChars.includes(e.key) && val[start] === e.key && start === end) {
+      e.preventDefault();
+      setTimeout(() => {
+        textarea.selectionStart = textarea.selectionEnd = start + 1;
+      }, 0);
+      return;
+    }
+
+    // Auto-delete matching pairs on Backspace
+    if (e.key === "Backspace" && start === end && start > 0) {
+      const charBefore = val[start - 1];
+      const charAfter = val[start];
+      if (pairs[charBefore] === charAfter) {
+        e.preventDefault();
+        const newVal = val.substring(0, start - 1) + val.substring(start + 1);
+        handleCodeChange(newVal);
+        setTimeout(() => {
+          textarea.selectionStart = textarea.selectionEnd = start - 1;
+        }, 0);
+        return;
+      }
+    }
+
+    // Tab key spaces insertion
     if (e.key === "Tab") {
       e.preventDefault();
-      const textarea = e.currentTarget;
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
-      const val = textarea.value;
       const newVal = val.substring(0, start) + "  " + val.substring(end);
-      setScratchpadCode(newVal);
+      handleCodeChange(newVal);
       setTimeout(() => {
         textarea.selectionStart = textarea.selectionEnd = start + 2;
       }, 0);
+      return;
     }
   };
 
@@ -218,6 +310,11 @@ export default function InterviewMode() {
         setCurrentQuestion(qMeta);
       }
 
+      const templates = parseTemplates(aiResponse);
+      if (Object.keys(templates).length > 0) {
+        setCodeTemplates(templates);
+      }
+
       speakText(aiResponse);
       const lower = aiResponse.toLowerCase();
       const isConclusion = lower.includes("concludes our interview") || 
@@ -227,7 +324,7 @@ export default function InterviewMode() {
       if (isConclusion) {
         setPendingAutoEnd(true);
       }
-      setExecutionOutput(`Reviewed by Interviewer:\n\n${stripQuestionTag(aiResponse)}`);
+      setExecutionOutput(`Reviewed by Interviewer:\n\n${cleanInterviewerMessage(aiResponse)}`);
     } catch (error) {
       console.error(error);
       setExecutionOutput("[Error]: Failed to retrieve AI Code Review. Please try again.");
@@ -570,6 +667,7 @@ export default function InterviewMode() {
     setViolations([]);
     setXpClaimed(false);
     setScratchpadCode("// Write your code or notes here...\n");
+    setCodeTemplates({});
 
     if (user?.id) {
       try {
@@ -597,6 +695,11 @@ export default function InterviewMode() {
       if (qMeta) {
         setQuestionMetas([qMeta]);
         setCurrentQuestion(qMeta);
+      }
+
+      const templates = parseTemplates(aiResponse);
+      if (Object.keys(templates).length > 0) {
+        setCodeTemplates(templates);
       }
 
       speakText(aiResponse);
@@ -660,6 +763,11 @@ export default function InterviewMode() {
         setQuestionMetas(prev => [...prev, qMeta]);
         setCurrentQuestion(qMeta);
         nextQuestionCount += 1;
+      }
+
+      const templates = parseTemplates(aiResponse);
+      if (Object.keys(templates).length > 0) {
+        setCodeTemplates(templates);
       }
 
       speakText(aiResponse);
@@ -1214,7 +1322,7 @@ export default function InterviewMode() {
 
                 <div className="text-sm md:text-base text-neutral-200 font-medium leading-relaxed">
                   {lastAssistantMessage ? (
-                    <ChatMarkdown content={stripQuestionTag(lastAssistantMessage)} />
+                    <ChatMarkdown content={cleanInterviewerMessage(lastAssistantMessage)} />
                   ) : (
                     <span className="text-neutral-500 italic">Interviewer is preparing the first question...</span>
                   )}
@@ -1277,7 +1385,7 @@ export default function InterviewMode() {
                     {msg.role === "user" ? (
                       <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                     ) : (
-                      <ChatMarkdown content={stripQuestionTag(msg.content)} />
+                      <ChatMarkdown content={cleanInterviewerMessage(msg.content)} />
                     )}
                   </div>
 
@@ -1380,7 +1488,7 @@ export default function InterviewMode() {
                 <textarea
                   ref={textareaRef}
                   value={scratchpadCode}
-                  onChange={(e) => setScratchpadCode(e.target.value)}
+                  onChange={(e) => handleCodeChange(e.target.value)}
                   onScroll={handleScroll}
                   onKeyDown={handleKeyDown}
                   className="absolute inset-0 w-full h-full bg-transparent text-transparent caret-white font-mono text-[11px] leading-[20px] p-4 resize-none focus:outline-none placeholder:text-neutral-700 custom-scrollbar z-10 whitespace-pre-wrap break-all m-0 border-0"

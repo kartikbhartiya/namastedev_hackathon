@@ -126,9 +126,11 @@ export function buildInterviewSystemPrompt(config: InterviewConfig): string {
   let roundGuidelines = "";
   if (config.roundType === "dsa") {
     roundGuidelines = `
-ROUND TYPE: Data Structures & Algorithms (DSA) / Coding
 - You MUST present a clear coding problem for the candidate to solve.
-- Instruct them to write their solution in the Code Scratchpad and submit it for your review using the 'Submit Code for Review' button.
+- For Coding/DSA problems, you MUST follow a realistic 3-stage process:
+  1. First Turn: Present the coding problem statement (with clear constraints and input/output examples). At the very end of your response, you MUST provide the boilerplate code templates for JavaScript, Python, Java, and C++ inside [TEMPLATE:<lang>]...[END_TEMPLATE] tags (see formatting rules below). Instruct the candidate to first explain their conceptual approach, algorithm, and Big-O complexity. DO NOT ask them to write code in the scratchpad yet.
+  2. Intermediate Turn(s): Ask follow-up questions to discuss their proposed algorithm, suggest improvements if needed, and verify edge cases.
+  3. Final Coding Turn: Once you are satisfied with their conceptual approach, explicitly instruct the candidate: "Write your solution in the Code Scratchpad on the right and click 'Submit Code for Review' when done."
 - Do not let them off easy. Challenge their choice of algorithms, time/space complexity (Big-O), and edge cases.
 - Analyze their submitted code closely when they send it for review.`;
   } else if (config.roundType === "system-design") {
@@ -186,10 +188,40 @@ Given an array of integers, how would you find the two numbers that add up to a 
 
 For follow-up probes on the SAME question, do NOT add a new tag. Just ask naturally.
 
+BOILERPLATE CODE TEMPLATE FORMAT:
+When you introduce a coding/DSA question for the first time, you MUST append the templates for the candidate to use. Write them exactly in this format at the very end of your response:
+[TEMPLATE:javascript]
+function solve(input) {
+  // write code
+}
+[END_TEMPLATE]
+[TEMPLATE:python]
+def solve(input):
+    # write code
+    pass
+[END_TEMPLATE]
+[TEMPLATE:java]
+class Solution {
+    public void solve(Object input) {
+        // write code
+    }
+}
+[END_TEMPLATE]
+[TEMPLATE:cpp]
+class Solution {
+public:
+    void solve(void* input) {
+        // write code
+    }
+};
+[END_TEMPLATE]
+
+Ensure you customize the function/class names and inputs to fit the problem. The frontend parses these tags automatically and loads the template into the scratchpad when they select a language. Do not output anything else inside these tags.
+
 INTERVIEWER RULES:
 1. Start with a professional greeting. Then ask your first question with the tag.
 2. Ask questions appropriate for the ${config.seniority} level. ${config.seniority === "senior" || config.roundType === "system-design" ? "Include at least one system design question." : ""}
-3. When asking a Coding or DSA question, you MUST present a concrete problem and explicitly command the candidate: "Write your solution in the Code Scratchpad on the right and click 'Submit Code for Review' when done." Do not just ask a conceptual question about coding.
+3. For Coding or DSA questions, follow the 3-stage process (discuss approach and Big-O first, then ask for code only after the approach is aligned).
 4. DO NOT write or output any internal thinking processes, scores, monologues, or assessment breakdowns in your dialogue. Only output the natural, professional dialogue you would speak to the candidate.
 5. After each candidate answer, analyze it critically:
    - If incomplete or vague, probe deeper with "Can you elaborate on..." or "What about edge cases?"
@@ -224,6 +256,27 @@ export function parseQuestionTag(content: string): QuestionMeta | null {
 /** Strip question tags from display text */
 export function stripQuestionTag(content: string): string {
   return content.replace(/\[QUESTION:\d+\|TYPE:\w[\w-]*\|TOPIC:[^\]]+\]\n?/g, "").trim();
+}
+
+/** Parse language template blocks from AI content */
+export function parseTemplates(content: string): Record<string, string> {
+  const templates: Record<string, string> = {};
+  const regex = /\[TEMPLATE:(\w+)\]([\s\S]*?)\[END_TEMPLATE\]/gi;
+  let match;
+  while ((match = regex.exec(content)) !== null) {
+    templates[match[1].toLowerCase()] = match[2].trim();
+  }
+  return templates;
+}
+
+/** Strip template tags from display text */
+export function stripTemplateTags(content: string): string {
+  return content.replace(/\[TEMPLATE:\w+\][\s\S]*?\[END_TEMPLATE\]\n?/gi, "").trim();
+}
+
+/** Clean all tags (question and template) from the text to be displayed */
+export function cleanInterviewerMessage(content: string): string {
+  return stripTemplateTags(stripQuestionTag(content));
 }
 
 // ——— Post-Interview Evaluation ———
