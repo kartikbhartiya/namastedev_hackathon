@@ -128,7 +128,7 @@ export function buildInterviewSystemPrompt(config: InterviewConfig): string {
     roundGuidelines = `
 ROUND TYPE: Data Structures & Algorithms (DSA) / Coding
 - You MUST present a clear coding problem for the candidate to solve.
-- Instruct them to write their solution in the JavaScript Scratchpad and submit it for your review using the 'Submit Code for Review' button.
+- Instruct them to write their solution in the Code Scratchpad and submit it for your review using the 'Submit Code for Review' button.
 - Do not let them off easy. Challenge their choice of algorithms, time/space complexity (Big-O), and edge cases.
 - Analyze their submitted code closely when they send it for review.`;
   } else if (config.roundType === "system-design") {
@@ -189,7 +189,7 @@ For follow-up probes on the SAME question, do NOT add a new tag. Just ask natura
 INTERVIEWER RULES:
 1. Start with a professional greeting. Then ask your first question with the tag.
 2. Ask questions appropriate for the ${config.seniority} level. ${config.seniority === "senior" || config.roundType === "system-design" ? "Include at least one system design question." : ""}
-3. When asking a Coding or DSA question, you MUST present a concrete problem and explicitly command the candidate: "Write your solution in the JavaScript Scratchpad on the right and click 'Submit Code for Review' when done." Do not just ask a conceptual question about coding.
+3. When asking a Coding or DSA question, you MUST present a concrete problem and explicitly command the candidate: "Write your solution in the Code Scratchpad on the right and click 'Submit Code for Review' when done." Do not just ask a conceptual question about coding.
 4. DO NOT write or output any internal thinking processes, scores, monologues, or assessment breakdowns in your dialogue. Only output the natural, professional dialogue you would speak to the candidate.
 5. After each candidate answer, analyze it critically:
    - If incomplete or vague, probe deeper with "Can you elaborate on..." or "What about edge cases?"
@@ -204,7 +204,8 @@ INTERVIEWER RULES:
 ${config.role === "behavioral" || config.roundType === "behavioral" ? "12. Use the STAR method to evaluate responses. Ask for specific examples." : ""}
 ${config.companyStyle === "google" ? "13. Emphasize algorithmic efficiency and Big-O time/space complexity analysis. Ask candidate to optimize their solution." : ""}
 ${config.companyStyle === "amazon" ? "13. Evaluate against Amazon Leadership Principles (Customer Obsession, Ownership, Bias for Action). Demand specific metrics and outcomes." : ""}
-12. Mix question types: at least 1 conceptual, 1 practical/coding.`;
+12. Mix question types: at least 1 conceptual, 1 practical/coding.
+14. Speak directly as a human interviewer. Avoid 'AI-like' metalanguage or metadata speech. Do NOT verbalize your assessment strategy, what you are trying to test, or why you are asking a question (e.g. do NOT say 'Let me assess your skills in X', 'I am evaluating your knowledge of Y', 'Now let's test your ability to Z', or 'I want to see how you handle...'). A human interviewer thinks these things internally; you must just ask the question or probe directly (e.g. say 'Can you explain how X works?' or 'Let's write a function for Y').`;
 }
 
 // ——— Question Tag Parser ———
@@ -243,10 +244,17 @@ export async function evaluateInterviewSession(
     ? `\n\nCANDIDATE CONFIDENCE RATINGS:\n${questionMetas.filter(q => q.confidenceRating).map(q => `- Q${q.number} (${q.topic}): ${q.confidenceRating}/5 confidence`).join("\n")}`
     : "";
 
+  const pacingNote = questionMetas && questionMetas.some(q => q.answeredAt)
+    ? `\n\nQUESTION PACING / TIME SPENT:\n${questionMetas.filter(q => q.answeredAt).map(q => {
+        const sec = Math.round((q.answeredAt! - q.startedAt) / 1000);
+        return `- Q${q.number} (${q.topic}): ${sec} seconds`;
+      }).join("\n")}`
+    : "";
+
   const evalPrompt = `You are an expert interview evaluator. Analyze this ${roleInfo.label} interview transcript for a ${config.seniority}-level candidate.
 
 TRANSCRIPT:
-${transcript.map(m => `${m.role === "user" ? "CANDIDATE" : "INTERVIEWER"}: ${m.content}`).join("\n\n")}${violationNote}${confidenceNote}
+${transcript.map(m => `${m.role === "user" ? "CANDIDATE" : "INTERVIEWER"}: ${m.content}`).join("\n\n")}${violationNote}${confidenceNote}${pacingNote}
 
 Evaluate the candidate and return ONLY a JSON object with this exact structure:
 {

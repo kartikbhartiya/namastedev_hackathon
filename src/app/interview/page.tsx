@@ -106,18 +106,18 @@ export default function InterviewMode() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [phase]);
 
-  // Regex-based Javascript syntax tokenizer
-  const tokenise = (code: string) => {
+  // Multi-language syntax tokenizer
+  const tokenise = (code: string, lang: string) => {
     const rules = [
-      { type: 'comment', regex: /^\/\/.*|^\/\*[\s\S]*?\*\// },
+      { type: 'comment', regex: lang === 'python' ? /^#.*/ : /^\/\/.*|^\/\*[\s\S]*?\*\// },
       { type: 'string', regex: /^"(?:\\.|[^"\\])*"|^'(?:\\.|[^'\\])*'|^`(?:\\.|[^`\\])*`/ },
       { type: 'number', regex: /^\b\d+(?:\.\d+)?\b/ },
-      { type: 'keyword', regex: /^\b(const|let|var|function|return|if|else|for|while|do|switch|case|break|continue|class|export|import|from|new|this|typeof|instanceof|async|await|try|catch|finally|throw|default|null|undefined|true|false)\b/ },
-      { type: 'builtin', regex: /^\b(console|log|error|warn|info|Math|JSON|Date|RegExp|Map|Set|Promise|Array|Object|String|Number|Boolean|window|document)\b/ },
+      { type: 'keyword', regex: /^\b(const|let|var|function|return|if|else|for|while|do|switch|case|break|continue|class|export|import|from|new|this|typeof|instanceof|async|await|try|catch|finally|throw|default|null|undefined|true|false|def|elif|as|in|is|not|and|or|pass|yield|global|nonlocal|lambda|public|private|protected|void|int|double|float|char|string|bool|boolean|struct|namespace|using|std|include|vector|final|interface|enum|extends|implements|static|throws)\b/ },
+      { type: 'builtin', regex: /^\b(console|log|error|warn|info|Math|JSON|Date|RegExp|Map|Set|Promise|Array|Object|String|Number|Boolean|window|document|print|len|range|list|dict|set|tuple|int|str|float|bool|type|open|sum|max|min|std|cout|cin|endl|vector|string|System|out|println)\b/ },
       { type: 'function', regex: /^[a-zA-Z_$][a-zA-Z0-9_$]*(?=\s*\()/ },
       { type: 'identifier', regex: /^[a-zA-Z_$][a-zA-Z0-9_$]*/ },
       { type: 'whitespace', regex: /^\s+/ },
-      { type: 'operator', regex: /^[\+\-\*\/%&\|\^!~=<>?:;.,{}()\[\]]/ },
+      { type: 'operator', regex: /^[\+\-\*\/%&\|\^!~=<>?:;.,{}()\[\]#]/ },
       { type: 'text', regex: /^./ }
     ];
 
@@ -145,8 +145,38 @@ export default function InterviewMode() {
   // ——— Scratchpad ———
   const [scratchpadOpen, setScratchpadOpen] = useState(false);
   const [scratchpadCode, setScratchpadCode] = useState("// Write your code or notes here...\nconsole.log('Testing code execution...');\n");
+  const [scratchpadLang, setScratchpadLang] = useState("javascript");
   const [executionOutput, setExecutionOutput] = useState<string | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const preRef = useRef<HTMLPreElement>(null);
+  const lineGutterRef = useRef<HTMLDivElement>(null);
+
+  const handleScroll = () => {
+    if (textareaRef.current && preRef.current) {
+      preRef.current.scrollTop = textareaRef.current.scrollTop;
+      preRef.current.scrollLeft = textareaRef.current.scrollLeft;
+    }
+    if (textareaRef.current && lineGutterRef.current) {
+      lineGutterRef.current.scrollTop = textareaRef.current.scrollTop;
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Tab") {
+      e.preventDefault();
+      const textarea = e.currentTarget;
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const val = textarea.value;
+      const newVal = val.substring(0, start) + "  " + val.substring(end);
+      setScratchpadCode(newVal);
+      setTimeout(() => {
+        textarea.selectionStart = textarea.selectionEnd = start + 2;
+      }, 0);
+    }
+  };
 
   // Submit code scratchpad to Groq for AI Interviewer review
   const handleSubmitCodeForReview = async () => {
@@ -156,7 +186,7 @@ export default function InterviewMode() {
     stopSpeaking();
     sounds.playSubmitChime();
 
-    const codeMessage = `Here is my code implementation for review:\n\`\`\`javascript\n${scratchpadCode}\n\`\`\``;
+    const codeMessage = `Here is my code implementation (in ${scratchpadLang}) for review:\n\`\`\`${scratchpadLang}\n${scratchpadCode}\n\`\`\``;
     const newMessages: Message[] = [...messagesRef.current, { role: "user", content: codeMessage }];
     setMessages(newMessages);
     setIsLoading(true);
@@ -821,9 +851,13 @@ export default function InterviewMode() {
         xp: (profile.xp || 0) + xpReward,
         earned_badge_ids: newBadges,
       });
+    } catch (err: any) {
+      console.warn("Failed to claim XP on database, updating local profile fallback:", err.message || err);
+      // Fallback updates to keep local experience consistent
+      profile.xp = (profile.xp || 0) + xpReward;
+      profile.earned_badge_ids = newBadges;
+    } finally {
       setXpClaimed(true);
-    } catch (err) {
-      console.error("Failed to claim XP:", err);
     }
   };
 
@@ -1275,14 +1309,27 @@ export default function InterviewMode() {
         {scratchpadOpen && (
           <aside className="h-1/2 md:h-full md:w-1/2 border-t md:border-t-0 md:border-l border-white/10 bg-[#0d0e15] flex flex-col" data-scratchpad>
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/10 bg-white/[0.02]">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-neutral-400 uppercase tracking-widest flex items-center gap-1.5">
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-xs font-bold text-neutral-400 uppercase tracking-widest flex items-center gap-1.5 shrink-0">
                   <Code2 className="w-3.5 h-3.5 text-violet-400" /> Code Scratchpad
                 </span>
+                
+                {/* Language Selector Dropdown */}
+                <select
+                  value={scratchpadLang}
+                  onChange={(e) => setScratchpadLang(e.target.value)}
+                  className="bg-neutral-950 border border-white/10 text-neutral-300 text-[11px] rounded px-1.5 py-0.5 focus:outline-none focus:border-violet-500 font-semibold cursor-pointer"
+                >
+                  <option value="javascript">JavaScript</option>
+                  <option value="python">Python</option>
+                  <option value="java">Java</option>
+                  <option value="cpp">C++</option>
+                </select>
+
                 <button
                   onClick={handleSubmitCodeForReview}
                   disabled={isLoading || isExecuting}
-                  className="px-3 py-1 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-[11px] font-bold flex items-center gap-1.5 transition-all shadow-md shadow-violet-500/20 active:scale-95 disabled:opacity-50"
+                  className="px-3 py-1 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-[11px] font-bold flex items-center gap-1.5 transition-all shadow-md shadow-violet-500/20 active:scale-95 disabled:opacity-50 shrink-0"
                 >
                   <Sparkles className="w-3.5 h-3.5 animate-pulse" /> Submit Code for Review
                 </button>
@@ -1292,34 +1339,61 @@ export default function InterviewMode() {
               </Button>
             </div>
 
-            {/* Editor Container with Syntax Highlighting Overlay */}
-            <div className="flex-1 relative font-mono text-sm overflow-hidden bg-[#0a0a0f]">
-              {/* Highlighted pre rendering beneath the textarea */}
-              <pre className="absolute inset-0 p-4 pointer-events-none whitespace-pre-wrap break-all overflow-y-auto custom-scrollbar select-none z-0" aria-hidden="true">
-                <code>
-                  {tokenise(scratchpadCode).map((t, idx) => {
-                    let className = "text-neutral-300";
-                    if (t.type === "keyword") className = "text-pink-400 font-semibold";
-                    else if (t.type === "builtin") className = "text-cyan-400";
-                    else if (t.type === "string") className = "text-emerald-400 font-medium";
-                    else if (t.type === "comment") className = "text-neutral-500 italic";
-                    else if (t.type === "number") className = "text-amber-400";
-                    else if (t.type === "function") className = "text-yellow-400";
-                    else if (t.type === "operator") className = "text-indigo-400";
-                    return <span key={idx} className={className}>{t.value}</span>;
-                  })}
-                </code>
-              </pre>
+            {/* Editor Body: Gutter + Syntax Highlighting Overlay */}
+            <div className="flex-1 flex overflow-hidden bg-[#07070a] border-b border-white/10">
+              {/* Line Numbers Gutter */}
+              <div 
+                ref={lineGutterRef}
+                className="w-10 bg-[#09090d] text-neutral-600 font-mono text-[11px] text-right pr-2.5 py-4 select-none border-r border-white/5 overflow-hidden flex flex-col shrink-0"
+              >
+                {Array.from({ length: Math.max(1, scratchpadCode.split("\n").length) }).map((_, idx) => (
+                  <div key={idx} className="h-[20px] leading-[20px]">
+                    {idx + 1}
+                  </div>
+                ))}
+              </div>
 
-              {/* Overlay textarea: transparent text, visible caret */}
-              <textarea
-                value={scratchpadCode}
-                onChange={(e) => setScratchpadCode(e.target.value)}
-                className="absolute inset-0 w-full h-full bg-transparent text-transparent caret-white font-mono p-4 resize-none focus:outline-none placeholder:text-neutral-700 custom-scrollbar z-10 whitespace-pre-wrap break-all"
-                placeholder="// Write your solution here..."
-                spellCheck={false}
-                data-scratchpad
-              />
+              {/* Editor Relative Container */}
+              <div className="flex-1 relative font-mono text-[11px] overflow-hidden">
+                {/* Highlighted pre rendering beneath the textarea */}
+                <pre 
+                  ref={preRef}
+                  className="absolute inset-0 p-4 pointer-events-none whitespace-pre-wrap break-all overflow-hidden select-none z-0 font-mono text-[11px] leading-[20px] m-0 border-0" 
+                  aria-hidden="true"
+                >
+                  <code>
+                    {tokenise(scratchpadCode, scratchpadLang).map((t, idx) => {
+                      let className = "text-neutral-300";
+                      if (t.type === "keyword") className = "text-pink-400 font-bold";
+                      else if (t.type === "builtin") className = "text-cyan-400 font-semibold";
+                      else if (t.type === "string") className = "text-emerald-400 font-medium";
+                      else if (t.type === "comment") className = "text-neutral-500 italic";
+                      else if (t.type === "number") className = "text-amber-400";
+                      else if (t.type === "function") className = "text-yellow-400";
+                      else if (t.type === "operator") className = "text-indigo-400";
+                      return <span key={idx} className={className}>{t.value}</span>;
+                    })}
+                  </code>
+                </pre>
+
+                {/* Overlay textarea: transparent text, visible caret */}
+                <textarea
+                  ref={textareaRef}
+                  value={scratchpadCode}
+                  onChange={(e) => setScratchpadCode(e.target.value)}
+                  onScroll={handleScroll}
+                  onKeyDown={handleKeyDown}
+                  className="absolute inset-0 w-full h-full bg-transparent text-transparent caret-white font-mono text-[11px] leading-[20px] p-4 resize-none focus:outline-none placeholder:text-neutral-700 custom-scrollbar z-10 whitespace-pre-wrap break-all m-0 border-0"
+                  placeholder={
+                    scratchpadLang === 'python' ? "# Write your Python solution here..." :
+                    scratchpadLang === 'cpp' ? "// Write your C++ solution here..." :
+                    scratchpadLang === 'java' ? "// Write your Java solution here..." :
+                    "// Write your solution here..."
+                  }
+                  spellCheck={false}
+                  data-scratchpad
+                />
+              </div>
             </div>
 
             {/* AI Code Review Panel (replaces normal execution output) */}
