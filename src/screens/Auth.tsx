@@ -5,29 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { EclixLogo } from "@/components/EclixLogo";
 import { cn } from "@/lib/utils";
-import { Loader2, ArrowLeft, Eye, EyeOff, Check, X, ShieldCheck, Mail, KeyRound, Sparkles } from "lucide-react";
-
-// ── Password Strength Rules ──────────────────────────────
-const PASSWORD_RULES = [
-  { id: "length", label: "At least 8 characters", test: (p: string) => p.length >= 8 },
-  { id: "uppercase", label: "One uppercase letter", test: (p: string) => /[A-Z]/.test(p) },
-  { id: "lowercase", label: "One lowercase letter", test: (p: string) => /[a-z]/.test(p) },
-  { id: "number", label: "One number", test: (p: string) => /\d/.test(p) },
-  { id: "special", label: "One special character", test: (p: string) => /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(p) },
-];
-
-function getPasswordStrength(password: string): { score: number; label: string; color: string } {
-  const passed = PASSWORD_RULES.filter((r) => r.test(password)).length;
-  if (passed <= 1) return { score: passed, label: "Weak", color: "bg-red-500" };
-  if (passed <= 2) return { score: passed, label: "Fair", color: "bg-orange-500" };
-  if (passed <= 3) return { score: passed, label: "Good", color: "bg-yellow-500" };
-  if (passed <= 4) return { score: passed, label: "Strong", color: "bg-emerald-400" };
-  return { score: passed, label: "Excellent", color: "bg-emerald-500" };
-}
-
-function isPasswordValid(password: string): boolean {
-  return PASSWORD_RULES.every((r) => r.test(password));
-}
+import { Loader2, ArrowLeft, ShieldCheck, Mail, KeyRound, Sparkles } from "lucide-react";
 
 // ── Clean Input ──────────────────────────────────────────
 const CleanInput = ({
@@ -37,18 +15,15 @@ const CleanInput = ({
   onChange,
   placeholder,
   disabled,
-  showPasswordToggle,
   error,
   ...props
 }: any) => {
-  const [showPassword, setShowPassword] = useState(false);
-
   return (
     <div className="space-y-1.5">
       <label className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">{label}</label>
       <div className="relative">
         <input
-          type={showPasswordToggle ? (showPassword ? "text" : "password") : type}
+          type={type}
           value={value}
           onChange={onChange}
           placeholder={placeholder}
@@ -62,64 +37,13 @@ const CleanInput = ({
           )}
           {...props}
         />
-        {showPasswordToggle && (
-          <button
-            type="button"
-            onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white transition-colors"
-          >
-            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </button>
-        )}
       </div>
       {error && <p className="text-[11px] text-red-400 font-medium">{error}</p>}
     </div>
   );
 };
 
-// ── Password Strength Indicator ──────────────────────────
-function PasswordStrengthIndicator({ password }: { password: string }) {
-  if (!password) return null;
-  const strength = getPasswordStrength(password);
 
-  return (
-    <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
-      {/* Strength bar */}
-      <div className="flex items-center gap-3">
-        <div className="flex-1 h-1.5 bg-neutral-800 rounded-full overflow-hidden">
-          <div
-            className={cn("h-full rounded-full transition-all duration-500", strength.color)}
-            style={{ width: `${(strength.score / PASSWORD_RULES.length) * 100}%` }}
-          />
-        </div>
-        <span className={cn("text-[11px] font-bold uppercase tracking-wider", 
-          strength.score <= 2 ? "text-red-400" : strength.score <= 3 ? "text-yellow-400" : "text-emerald-400"
-        )}>
-          {strength.label}
-        </span>
-      </div>
-
-      {/* Individual rules */}
-      <div className="grid grid-cols-1 gap-1">
-        {PASSWORD_RULES.map((rule) => {
-          const passed = rule.test(password);
-          return (
-            <div
-              key={rule.id}
-              className={cn(
-                "flex items-center gap-2 text-[11px] font-medium transition-colors duration-200",
-                passed ? "text-emerald-400" : "text-neutral-500"
-              )}
-            >
-              {passed ? <Check className="h-3 w-3 shrink-0" /> : <X className="h-3 w-3 shrink-0" />}
-              {rule.label}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 // ── OTP Input ────────────────────────────────────────────
 function OtpInput({ length = 6, onComplete, disabled }: { length?: number; onComplete: (code: string) => void; disabled?: boolean }) {
@@ -227,11 +151,8 @@ const FEATURES = [
 // ── MAIN AUTH PAGE ────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════
 const Auth = () => {
-  const [activeTab, setActiveTab] = useState<"signin" | "signup">("signup");
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
   const [mounted, setMounted] = useState(false);
 
   // OTP verification state
@@ -239,7 +160,7 @@ const Auth = () => {
   const [otpEmail, setOtpEmail] = useState("");
   const [resendCooldown, setResendCooldown] = useState(0);
 
-  const { user, profile, signIn, signUp, resetPassword, verifyOtp, resendOtp, loading: authLoading } = useAuth();
+  const { user, profile, sendAuthOtp, verifyOtp, resendOtp, loading: authLoading } = useAuth();
   const router = useRouter();
 
   // Redirect if already logged in
@@ -266,24 +187,12 @@ const Auth = () => {
   }, [resendCooldown]);
 
   // ── Handlers ──────────────────────────────────────────
-  const handleSignIn = async (e: React.FormEvent) => {
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email) return;
     setIsLoading(true);
     try {
-      await signIn(email, password);
-    } catch (error: any) {
-      // Errors are handled by AuthContext toast
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isPasswordValid(password)) return;
-    setIsLoading(true);
-    try {
-      await signUp(email, password, name);
+      await sendAuthOtp(email);
       setOtpEmail(email);
       setShowOtpScreen(true);
       setResendCooldown(60);
@@ -313,18 +222,6 @@ const Auth = () => {
       setResendCooldown(60);
     } catch (error: any) {
       // Errors are handled by AuthContext toast
-    }
-  };
-
-  const handleForgotPassword = async () => {
-    if (!email) return;
-    setIsLoading(true);
-    try {
-      await resetPassword(email);
-    } catch (error: any) {
-      // Errors are handled by AuthContext toast
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -398,11 +295,10 @@ const Auth = () => {
               type="button"
               onClick={() => {
                 setShowOtpScreen(false);
-                setActiveTab("signup");
               }}
               className="flex items-center justify-center gap-2 w-full text-sm text-neutral-400 hover:text-white transition-colors font-medium"
             >
-              <ArrowLeft className="h-4 w-4" /> Back to Sign Up
+              <ArrowLeft className="h-4 w-4" /> Back to Email
             </button>
           </div>
         </div>
@@ -492,65 +388,21 @@ const Auth = () => {
             <span className="text-base font-extrabold tracking-tight text-white">Orbit</span>
           </button>
 
-          {/* Tab Switcher */}
-          <div className="flex items-center bg-neutral-900/80 rounded-xl p-1 mb-8 border border-white/5">
-            <button
-              type="button"
-              onClick={() => setActiveTab("signup")}
-              className={cn(
-                "flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200",
-                activeTab === "signup"
-                  ? "bg-white/10 text-white shadow-sm"
-                  : "text-neutral-500 hover:text-neutral-300"
-              )}
-            >
-              Sign Up
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("signin")}
-              className={cn(
-                "flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200",
-                activeTab === "signin"
-                  ? "bg-white/10 text-white shadow-sm"
-                  : "text-neutral-500 hover:text-neutral-300"
-              )}
-            >
-              Sign In
-            </button>
-          </div>
-
           {/* Heading */}
           <div className="mb-8">
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-              {activeTab === "signin" ? "Welcome back" : "Create your account"}
+              Continue with Email
             </h1>
             <p className="text-sm text-neutral-500 mt-1.5">
-              {activeTab === "signin"
-                ? "Sign in to continue your learning journey"
-                : "Start your journey with Orbit's AI workspace"}
+              Start your journey with Orbit's AI workspace
             </p>
           </div>
 
           {/* Form */}
           <form
-            onSubmit={activeTab === "signin" ? handleSignIn : handleSignUp}
+            onSubmit={handleSendOtp}
             className="space-y-5"
           >
-            {activeTab === "signup" && (
-              <CleanInput
-                label="Full Name"
-                name="name"
-                id="auth-name"
-                autoComplete="name"
-                placeholder="Enter your full name"
-                value={name}
-                onChange={(e: any) => setName(e.target.value)}
-                disabled={isLoading}
-                required
-              />
-            )}
-
             <CleanInput
               label="Email Address"
               type="email"
@@ -564,41 +416,10 @@ const Auth = () => {
               required
             />
 
-            <CleanInput
-              label="Password"
-              name="password"
-              id="auth-password"
-              autoComplete={activeTab === "signin" ? "current-password" : "new-password"}
-              placeholder="••••••••"
-              value={password}
-              onChange={(e: any) => setPassword(e.target.value)}
-              disabled={isLoading}
-              showPasswordToggle
-              required
-              minLength={8}
-            />
-
-            {/* Password Strength - only on signup */}
-            {activeTab === "signup" && <PasswordStrengthIndicator password={password} />}
-
-            {/* Forgot Password - only on signin */}
-            {activeTab === "signin" && (
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={handleForgotPassword}
-                  disabled={!email || isLoading}
-                  className="text-xs font-medium text-[#ff6c37] hover:text-[#ff8454] transition-colors disabled:text-neutral-600 disabled:cursor-not-allowed"
-                >
-                  Forgot password?
-                </button>
-              </div>
-            )}
-
             {/* Submit */}
             <button
               type="submit"
-              disabled={isLoading || (activeTab === "signup" && !isPasswordValid(password))}
+              disabled={isLoading || !email}
               className={cn(
                 "w-full h-12 rounded-xl font-semibold text-sm transition-all duration-200 mt-2",
                 "bg-[#ff6c37] text-white",
@@ -609,40 +430,11 @@ const Auth = () => {
             >
               {isLoading ? (
                 <Loader2 className="h-5 w-5 animate-spin mx-auto" />
-              ) : activeTab === "signin" ? (
-                "Sign In"
               ) : (
-                "Create Account"
+                "Continue"
               )}
             </button>
           </form>
-
-          {/* Switch Tab */}
-          <p className="text-center text-sm mt-8 text-neutral-500">
-            {activeTab === "signin" ? (
-              <>
-                Don't have an account?{" "}
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("signup")}
-                  className="text-[#ff6c37] font-semibold hover:text-[#ff8454] transition-colors"
-                >
-                  Sign Up
-                </button>
-              </>
-            ) : (
-              <>
-                Already have an account?{" "}
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("signin")}
-                  className="text-[#ff6c37] font-semibold hover:text-[#ff8454] transition-colors"
-                >
-                  Sign In
-                </button>
-              </>
-            )}
-          </p>
 
           {/* Terms */}
           <p className="text-center text-[11px] text-neutral-600 mt-6 leading-relaxed">

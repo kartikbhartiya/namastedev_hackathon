@@ -33,14 +33,11 @@ export interface AuthContextType {
   authState: AuthState;
   isAdmin: boolean;
   isCollegeVerified: boolean;
-  signIn: (email: string, password: string) => Promise<any>;
-  signUp: (email: string, password: string, name?: string) => Promise<any>;
+  sendAuthOtp: (email: string) => Promise<any>;
   logout: () => Promise<void>;
-  resetPassword: (email: string) => Promise<void>;
   refreshProfile: () => Promise<void>;
   updateUserStats: (stats: Partial<UserProfile>) => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
-  updatePassword: (password: string) => Promise<void>;
   verifyOtp: (email: string, token: string) => Promise<any>;
   resendOtp: (email: string) => Promise<void>;
 }
@@ -174,43 +171,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  // ── Sign In ──────────────────────────────────────────────
-  const handleSignIn = async (email: string, password: string) => {
+  // ── Send Auth OTP ──────────────────────────────────────────────
+  const handleSendAuthOtp = async (email: string) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      toast.success("Successfully logged in!");
-      await refreshProfile();
-      return data;
-    } catch (err: any) {
-      toast.error(err.message || "Sign in failed");
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ── Sign Up ──────────────────────────────────────────────
-  // Creates the Supabase auth user. Profile row is created on first
-  // successful sign-in (handled by fetchOrCreateProfile).
-  const handleSignUp = async (email: string, password: string, name?: string) => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signInWithOtp({
         email,
-        password,
         options: {
-          data: { full_name: name, name },
+          shouldCreateUser: true,
         },
       });
       if (error) throw error;
 
-      // Supabase will send a verification email / OTP automatically
       toast.success("Verification code sent! Check your email.");
       return data;
     } catch (err: any) {
-      toast.error(err.message || "Signup failed");
+      toast.error(err.message || "Failed to send code");
       throw err;
     } finally {
       setLoading(false);
@@ -224,7 +200,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data, error } = await supabase.auth.verifyOtp({
         email,
         token,
-        type: "signup",
+        type: "email",
       });
       if (error) throw error;
       toast.success("Email verified! Welcome to Orbit.");
@@ -269,19 +245,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // ── Reset Password ─────────────────────────────────────
-  const handleResetPassword = async (email: string) => {
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth?reset=true`,
-      });
-      if (error) throw error;
-      toast.success("Password reset instructions sent to your email!");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to send reset email");
-    }
-  };
-
   // ── Update Profile ─────────────────────────────────────
   const updateProfile = async (updates: Partial<UserProfile>) => {
     if (!profile && !user) return;
@@ -298,17 +261,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // ── Update Password ────────────────────────────────────
-  const updatePassword = async (password: string) => {
-    try {
-      const { error } = await supabase.auth.updateUser({ password });
-      if (error) throw error;
-      toast.success("Password updated successfully!");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to update password");
-      throw err;
-    }
-  };
+
 
   // ── Update Stats ───────────────────────────────────────
   const updateUserStats = async (stats: Partial<UserProfile>) => {
@@ -325,14 +278,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         authState,
         isAdmin: profile?.role === "admin" || profile?.role === "super_admin",
         isCollegeVerified: true,
-        signIn: handleSignIn,
-        signUp: handleSignUp,
+        sendAuthOtp: handleSendAuthOtp,
         logout: handleLogout,
-        resetPassword: handleResetPassword,
         refreshProfile,
         updateUserStats,
         updateProfile,
-        updatePassword,
         verifyOtp: handleVerifyOtp,
         resendOtp: handleResendOtp,
       }}

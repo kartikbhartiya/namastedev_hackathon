@@ -8,7 +8,7 @@ import { Loader2, User, Key, LogOut, Award, Save, RefreshCw, Check, Sparkles, Bo
 import { EclixLogo } from "@/components/EclixLogo";
 
 export default function ProfileSettingsPage() {
-  const { user, profile, updateProfile, updatePassword, logout, loading } = useAuth();
+  const { user, profile, updateProfile, logout, loading } = useAuth();
   const router = useRouter();
 
   const [name, setName] = useState("");
@@ -18,10 +18,8 @@ export default function ProfileSettingsPage() {
   const [course, setCourse] = useState("");
   const [avatarSeed, setAvatarSeed] = useState("");
   
-  const [newPassword, setNewPassword] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
-  const [updatingPass, setUpdatingPass] = useState(false);
-  const [activeTab, setActiveTab] = useState<"details" | "security" | "badges">("details");
+  const [activeTab, setActiveTab] = useState<"details" | "badges">("details");
 
   useEffect(() => {
     if (!loading && !user) {
@@ -65,17 +63,6 @@ export default function ProfileSettingsPage() {
     }
   };
 
-  const handleUpdatePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newPassword || newPassword.length < 6) return;
-    setUpdatingPass(true);
-    try {
-      await updatePassword(newPassword);
-      setNewPassword("");
-    } finally {
-      setUpdatingPass(false);
-    }
-  };
 
   const handleLogout = async () => {
     await logout();
@@ -219,16 +206,6 @@ export default function ProfileSettingsPage() {
           <User className="h-4 w-4" /> Personal Details
         </button>
 
-        <button
-          onClick={() => setActiveTab("security")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-            activeTab === "security"
-              ? "bg-primary text-white shadow-md shadow-primary/20"
-              : "text-neutral-400 hover:text-white hover:bg-white/5"
-          }`}
-        >
-          <Key className="h-4 w-4" /> Security & Auth
-        </button>
 
         <button
           onClick={() => setActiveTab("badges")}
@@ -330,39 +307,7 @@ export default function ProfileSettingsPage() {
         </form>
       )}
 
-      {/* Tab 2: Security & Password */}
-      {activeTab === "security" && (
-        <form onSubmit={handleUpdatePassword} className="space-y-6 bg-neutral-900/60 p-6 sm:p-8 rounded-2xl border border-white/10">
-          <div>
-            <h3 className="text-lg font-bold text-white">Change Password</h3>
-            <p className="text-xs text-neutral-400 mt-1">
-              Set a new secure password for your Orbit account.
-            </p>
-          </div>
 
-          <div className="space-y-2 max-w-md">
-            <label className="text-xs font-semibold text-neutral-300">New Password</label>
-            <input
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="••••••••"
-              minLength={6}
-              className="w-full h-11 px-4 rounded-xl bg-neutral-950 border border-white/10 text-sm text-white placeholder:text-neutral-600 focus:outline-none focus:border-primary"
-              required
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={updatingPass || !newPassword}
-            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-white font-bold text-sm hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 disabled:opacity-50"
-          >
-            {updatingPass ? <Loader2 className="h-4 w-4 animate-spin" /> : <Key className="h-4 w-4" />}
-            Update Password
-          </button>
-        </form>
-      )}
 
       {/* Tab 3: Badges */}
       {activeTab === "badges" && (
