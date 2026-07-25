@@ -34,14 +34,15 @@ export interface AuthContextType {
   isAdmin: boolean;
   isCollegeVerified: boolean;
   signIn: (email: string, password: string) => Promise<any>;
-  signUp: (email: string, password: string, name?: string, metadata?: Record<string, any>) => Promise<any>;
+  signUp: (email: string, password: string, name?: string) => Promise<any>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   refreshProfile: () => Promise<void>;
   updateUserStats: (stats: Partial<UserProfile>) => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
-  demoSignIn: () => Promise<void>;
+  verifyOtp: (email: string, token: string) => Promise<any>;
+  resendOtp: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -53,42 +54,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [authState, setAuthState] = useState<AuthState>("INITIALIZING");
 
+  // Helper to build a default profile from an auth user object
+  const buildDefaultProfile = (authUser: any): UserProfile => ({
+    id: authUser.id,
+    email: authUser.email ?? null,
+    name:
+      authUser.user_metadata?.full_name ||
+      authUser.user_metadata?.name ||
+      authUser.email?.split("@")[0] ||
+      "Student Scholar",
+    photo_url:
+      authUser.user_metadata?.avatar_url ||
+      `https://api.dicebear.com/7.x/bottts/svg?seed=${authUser.email}`,
+    role: "user",
+    study_streak: 1,
+    xp: 10,
+    course: "btech",
+    earned_badge_ids: [],
+    has_seen_onboarding: false,
+  });
+
+  // Fetch or create profile for a given auth user with safety timeout
+  const fetchOrCreateProfile = async (authUser: any): Promise<UserProfile | null> => {
+    const fallback = buildDefaultProfile(authUser);
+    try {
+      const queryPromise = supabase
+        .from("users")
+        .select("*")
+        .eq("id", authUser.id)
+        .maybeSingle();
+
+      const timeoutPromise = new Promise<{ data: any }>((resolve) =>
+        setTimeout(() => resolve({ data: null }), 2000)
+      );
+
+      const { data: profileData } = await Promise.race([queryPromise, timeoutPromise]);
+
+      if (profileData) {
+        return profileData;
+      }
+      return fallback;
+    } catch (e) {
+      console.error("Error fetching/creating profile:", e);
+      return fallback;
+    }
+  };
+
   const refreshProfile = async () => {
     try {
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      const {
+        data: { session: currentSession },
+      } = await supabase.auth.getSession();
       if (currentSession?.user) {
         setSession(currentSession);
         setUser(currentSession.user);
-        
-        // Fetch profile
-        let { data: profileData } = await supabase
-          .from("users")
-          .select("*")
-          .eq("id", currentSession.user.id)
-          .maybeSingle();
 
-        // Automatic fallback profile creation if user exists in auth but not in users table
-        if (!profileData) {
-          const newProfile: UserProfile = {
-            id: currentSession.user.id,
-            email: currentSession.user.email ?? null,
-            name: currentSession.user.user_metadata?.full_name || currentSession.user.user_metadata?.name || currentSession.user.email?.split("@")[0] || "Student Scholar",
-            photo_url: currentSession.user.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${currentSession.user.email}`,
-            role: "user",
-            study_streak: 1,
-            xp: 10,
-            course: "btech",
-            earned_badge_ids: [],
-            has_seen_onboarding: false
-          };
-          const { data: createdProfile, error } = await supabase.from("users").upsert(newProfile).select().maybeSingle();
-          if (!error && createdProfile) {
-            profileData = createdProfile;
-          } else {
-            profileData = newProfile;
-          }
-        }
-        
+        const profileData = await fetchOrCreateProfile(currentSession.user);
         setProfile(profileData);
         setAuthState("AUTHENTICATED_READY");
       } else {
@@ -106,6 +127,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
+    // Safety fallback timer to prevent infinite loading spinners on slow/hanging networks
+    const safetyTimer = setTimeout(() => {
+      setLoading(false);
+    }, 2500);
+
     try {
       refreshProfile();
     } catch (err) {
@@ -120,29 +146,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (currentSession) {
             setUser(currentSession.user);
             setSession(currentSession);
-            let { data: profileData } = await supabase
-              .from("users")
-              .select("*")
-              .eq("id", currentSession.user.id)
-              .maybeSingle();
 
-            if (!profileData) {
-              const newProfile: UserProfile = {
-                id: currentSession.user.id,
-                email: currentSession.user.email ?? null,
-                name: currentSession.user.user_metadata?.full_name || currentSession.user.user_metadata?.name || currentSession.user.email?.split("@")[0] || "Student Scholar",
-                photo_url: currentSession.user.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${currentSession.user.email}`,
-                role: "user",
-                study_streak: 1,
-                xp: 10,
-                course: "btech",
-                earned_badge_ids: [],
-                has_seen_onboarding: false
-              };
-              await supabase.from("users").upsert(newProfile);
-              profileData = newProfile;
-            }
-
+            const profileData = await fetchOrCreateProfile(currentSession.user);
             setProfile(profileData);
             setAuthState("AUTHENTICATED_READY");
           } else {
@@ -164,10 +169,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     return () => {
+      clearTimeout(safetyTimer);
       if (subscription) subscription.unsubscribe();
     };
   }, []);
 
+  // ── Sign In ──────────────────────────────────────────────
   const handleSignIn = async (email: string, password: string) => {
     setLoading(true);
     try {
@@ -184,34 +191,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // ── Sign Up ──────────────────────────────────────────────
+  // Creates the Supabase auth user. Profile row is created on first
+  // successful sign-in (handled by fetchOrCreateProfile).
   const handleSignUp = async (email: string, password: string, name?: string) => {
     setLoading(true);
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { name } }
+        options: {
+          data: { full_name: name, name },
+        },
       });
       if (error) throw error;
-      
-      if (data.user) {
-        const profileInfo: UserProfile = {
-          id: data.user.id,
-          email: data.user.email ?? null,
-          name: name || email.split("@")[0],
-          photo_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${email}`,
-          role: "user",
-          study_streak: 1,
-          xp: 10,
-          course: "btech",
-          earned_badge_ids: [],
-          has_seen_onboarding: false
-        };
-        await supabase.from("users").upsert(profileInfo);
-      }
-      
-      toast.success("Account created successfully!");
-      await refreshProfile();
+
+      // Supabase will send a verification email / OTP automatically
+      toast.success("Verification code sent! Check your email.");
       return data;
     } catch (err: any) {
       toast.error(err.message || "Signup failed");
@@ -221,6 +217,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // ── Verify Email OTP ────────────────────────────────────
+  const handleVerifyOtp = async (email: string, token: string) => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({
+        email,
+        token,
+        type: "signup",
+      });
+      if (error) throw error;
+      toast.success("Email verified! Welcome to Orbit.");
+      await refreshProfile();
+      return data;
+    } catch (err: any) {
+      toast.error(err.message || "Invalid verification code");
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Resend OTP ──────────────────────────────────────────
+  const handleResendOtp = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email,
+      });
+      if (error) throw error;
+      toast.success("A new verification code has been sent!");
+    } catch (err: any) {
+      toast.error(err.message || "Could not resend code. Try again later.");
+    }
+  };
+
+  // ── Logout ──────────────────────────────────────────────
   const handleLogout = async () => {
     setLoading(true);
     try {
@@ -237,10 +269,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // ── Reset Password ─────────────────────────────────────
   const handleResetPassword = async (email: string) => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth?reset=true`
+        redirectTo: `${window.location.origin}/auth?reset=true`,
       });
       if (error) throw error;
       toast.success("Password reset instructions sent to your email!");
@@ -249,6 +282,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // ── Update Profile ─────────────────────────────────────
   const updateProfile = async (updates: Partial<UserProfile>) => {
     if (!profile && !user) return;
     const userId = profile?.id || user?.id;
@@ -264,6 +298,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // ── Update Password ────────────────────────────────────
   const updatePassword = async (password: string) => {
     try {
       const { error } = await supabase.auth.updateUser({ password });
@@ -275,33 +310,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // ── Update Stats ───────────────────────────────────────
   const updateUserStats = async (stats: Partial<UserProfile>) => {
     await updateProfile(stats);
-  };
-
-  const demoSignIn = async () => {
-    setLoading(true);
-    setUser({ id: "demo-judge", email: "judge@orbit.com" });
-    setSession({ user: { id: "demo-judge" } });
-    setProfile({
-      id: "demo-judge",
-      email: "judge@orbit.com",
-      name: "Hackathon Judge",
-      photo_url: "https://api.dicebear.com/7.x/bottts/svg?seed=OrbitJudge",
-      role: "user",
-      study_streak: 8,
-      xp: 1280,
-      course: "btech",
-      earned_badge_ids: ["quiz-master", "stack-tracer", "interview-pro"],
-      has_seen_onboarding: true,
-      total_uptime: 745,
-      college_name: "AKTU University",
-      branch: "Computer Science",
-      year: "3rd Year"
-    });
-    setAuthState("AUTHENTICATED_READY");
-    setLoading(false);
-    toast.success("Demo Mode Activated!");
   };
 
   return (
@@ -322,7 +333,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateUserStats,
         updateProfile,
         updatePassword,
-        demoSignIn
+        verifyOtp: handleVerifyOtp,
+        resendOtp: handleResendOtp,
       }}
     >
       {children}

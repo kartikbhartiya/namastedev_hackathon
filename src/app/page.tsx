@@ -121,6 +121,8 @@ export default function Dashboard() {
   const [logs, setLogs] = useState<string[]>([]);
   const [latestSession, setLatestSession] = useState<any>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
+  const [activityLevels, setActivityLevels] = useState<number[]>(new Array(364).fill(0));
+  const [timelineEvents, setTimelineEvents] = useState<any[]>([]);
 
   useEffect(() => {
     setLogs([
@@ -130,13 +132,78 @@ export default function Dashboard() {
     ]);
 
     if (user?.id) {
-      db.aiSessions.getAll(user.id, 1)
-        .then((sessions) => {
+      Promise.all([
+        db.aiSessions.getAll(user.id, 50),
+        db.interviews.getByUser(user.id, 20)
+      ])
+        .then(([sessions, interviews]) => {
           if (sessions && sessions.length > 0) {
             setLatestSession(sessions[0]);
           }
+          
+          // 1. Calculate Activity Heatmap for last 364 days (52 weeks)
+          const now = new Date();
+          now.setHours(0, 0, 0, 0);
+          const dayCounts = new Array(364).fill(0);
+          
+          const countActivity = (dateStr: string) => {
+            if (!dateStr) return;
+            const d = new Date(dateStr);
+            d.setHours(0, 0, 0, 0);
+            const diffTime = now.getTime() - d.getTime();
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            if (diffDays >= 0 && diffDays < 364) {
+              dayCounts[363 - diffDays]++; // 363 is today, 0 is 364 days ago
+            }
+          };
+
+          (sessions || []).forEach((s: any) => countActivity(s.created_at || s.updated_at));
+          (interviews || []).forEach((i: any) => countActivity(i.created_at));
+
+          const levels = dayCounts.map(count => {
+            if (count === 0) return 0;
+            if (count <= 2) return 1;
+            if (count <= 5) return 2;
+            return 3;
+          });
+          setActivityLevels(levels);
+
+          // 2. Build Timeline Events
+          const allEvents = [
+            ...(sessions || []).map((s: any) => ({
+              id: `session-${s.id}`,
+              date: new Date(s.created_at || s.updated_at),
+              title: `AI Session: ${s.title || 'Untitled'}`,
+              subtitle: `Mode: ${s.mode || 'text'}`,
+              icon: Network,
+            })),
+            ...(interviews || []).map((i: any) => ({
+              id: `interview-${i.id}`,
+              date: new Date(i.created_at),
+              title: `Mock Interview: ${i.role_target || 'Role'} (${i.seniority || 'Level'})`,
+              subtitle: `Score: ${i.score !== null ? i.score : 'Incomplete'}`,
+              icon: ShieldAlert,
+            }))
+          ].sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 3);
+
+          const timeAgo = (date: Date) => {
+            const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
+            if (seconds < 60) return `Just now`;
+            const minutes = Math.floor(seconds / 60);
+            if (minutes < 60) return `${minutes}m ago`;
+            const hours = Math.floor(minutes / 60);
+            if (hours < 24) return `${hours}h ago`;
+            const days = Math.floor(hours / 24);
+            return `${days}d ago`;
+          };
+
+          setTimelineEvents(allEvents.map(e => ({
+            ...e,
+            timeString: timeAgo(e.date)
+          })));
+
         })
-        .catch((err) => console.error("Error loading latest session:", err))
+        .catch((err) => console.error("Error loading real dashboard data:", err))
         .finally(() => setSessionLoading(false));
     } else {
       setSessionLoading(false);
@@ -173,7 +240,7 @@ export default function Dashboard() {
   const activeCourseLabel = profile?.course ? profile.course.toUpperCase() : "BTECH";
 
   return (
-    <div className="w-full max-w-5xl mx-auto space-y-12 sm:space-y-24 pt-20 sm:pt-32 pb-10 sm:pb-16 px-4 sm:px-6 vignette-bg select-none">
+    <div className="w-full max-w-5xl mx-auto space-y-12 sm:space-y-24 pb-10 sm:pb-16 px-4 sm:px-6 vignette-bg select-none">
       
       {/* 1. HERO SPLIT SECTION - High contrast & catchy */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-10 items-stretch">
@@ -198,28 +265,45 @@ export default function Dashboard() {
         </div>
 
         {/* Right User Card Panel (1/3 width) - Eye-Catching Mini Box */}
-        <div className="p-6 rounded-xl bg-[#0b0b0b] border border-white/5 flex flex-col justify-between gap-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-neutral-950 border border-white/10 flex items-center justify-center font-bold text-sm text-[#ff6c37] uppercase">
-              {scholarName[0]}
+        {user ? (
+          <div className="p-6 rounded-xl bg-[#0b0b0b] border border-white/5 flex flex-col justify-between gap-6">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-neutral-950 border border-white/10 flex items-center justify-center font-bold text-sm text-[#ff6c37] uppercase">
+                {scholarName[0]}
+              </div>
+              <div>
+                <span className="text-neutral-500 text-[10px] uppercase font-bold tracking-wider block">Logged in as</span>
+                <span className="text-white text-sm font-semibold block">{scholarName}</span>
+              </div>
             </div>
-            <div>
-              <span className="text-neutral-500 text-[10px] uppercase font-bold tracking-wider block">Logged in as</span>
-              <span className="text-white text-sm font-semibold block">{scholarName}</span>
-            </div>
-          </div>
 
-          <div className="space-y-2 border-t border-white/5 pt-4 text-xs text-neutral-400">
-            <div className="flex justify-between">
-              <span>Track Course:</span>
-              <span className="text-white font-semibold uppercase">{activeCourseLabel}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Current Streak:</span>
-              <span className="text-[#ff6c37] font-bold">{profile?.study_streak || 0} Days</span>
+            <div className="space-y-2 border-t border-white/5 pt-4 text-xs text-neutral-400">
+              <div className="flex justify-between">
+                <span>Track Course:</span>
+                <span className="text-white font-semibold uppercase">{activeCourseLabel}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Current Streak:</span>
+                <span className="text-[#ff6c37] font-bold">{profile?.study_streak || 0} Days</span>
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="p-6 rounded-xl bg-[#0b0b0b] border border-white/5 flex flex-col justify-between gap-6">
+            <div className="space-y-2">
+              <h3 className="text-white font-bold tracking-tight">Unlock Your Workspace</h3>
+              <p className="text-[13px] text-neutral-400 leading-relaxed">
+                Sign in to save your syllabus progress, track your streak, and retain memory across AI sessions.
+              </p>
+            </div>
+            <button
+              onClick={() => router.push("/auth")}
+              className="w-full h-10 rounded-lg bg-white hover:bg-neutral-200 text-black font-semibold text-sm transition-colors"
+            >
+              Sign In / Register
+            </button>
+          </div>
+        )}
 
       </section>
 
@@ -316,7 +400,7 @@ export default function Dashboard() {
           <MetricWidget label="Achievements" value={`${profile?.earned_badge_ids?.length || 0} unlocked`} trend="Milestones" icon={Award} />
           <MetricWidget label="Focus Time" value={`${((profile?.total_uptime || 0) / 60).toFixed(1)}h`} trend="Focus session" icon={Clock} />
         </div>
-        <StudyHeatmap streak={profile?.study_streak || 1} />
+        <StudyHeatmap streak={profile?.study_streak || 1} activityLevels={activityLevels} />
       </section>
 
       {/* 5. MODULAR SECTIONS */}
@@ -361,35 +445,24 @@ export default function Dashboard() {
         </span>
         
         <div className="p-6 rounded-xl bg-[#0b0b0b] border border-white/5 space-y-6">
-          <div className="flex items-start gap-4">
-            <div className="p-1.5 rounded-md bg-white/5 text-[#9B9B9B] mt-0.5 shrink-0">
-              <Network className="h-4 w-4" />
-            </div>
-            <div>
-              <span className="text-[13px] font-semibold text-white block">Concept Graph Node Generated</span>
-              <span className="text-[11px] text-[#707070]">2 hours ago • visualizer logic</span>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-4">
-            <div className="p-1.5 rounded-md bg-white/5 text-[#9B9B9B] mt-0.5 shrink-0">
-              <ShieldAlert className="h-4 w-4" />
-            </div>
-            <div>
-              <span className="text-[13px] font-semibold text-white block">Behavioral Mock Interview Completed</span>
-              <span className="text-[11px] text-[#707070]">Yesterday • grading engine</span>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-4">
-            <div className="p-1.5 rounded-md bg-white/5 text-[#9B9B9B] mt-0.5 shrink-0">
-              <Cpu className="h-4 w-4" />
-            </div>
-            <div>
-              <span className="text-[13px] font-semibold text-white block">Llama 3.3 Core Initialized</span>
-              <span className="text-[11px] text-[#707070]">3 days ago • inference model</span>
-            </div>
-          </div>
+          {timelineEvents.length > 0 ? (
+            timelineEvents.map((event) => {
+              const EventIcon = event.icon;
+              return (
+                <div key={event.id} className="flex items-start gap-4">
+                  <div className="p-1.5 rounded-md bg-white/5 text-[#9B9B9B] mt-0.5 shrink-0">
+                    <EventIcon className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <span className="text-[13px] font-semibold text-white block">{event.title}</span>
+                    <span className="text-[11px] text-[#707070]">{event.timeString} • {event.subtitle}</span>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="text-[12px] text-neutral-500 italic">No recent activity found. Launch the AI Tutor or start a mock interview!</div>
+          )}
         </div>
 
         {/* Collapsed Developer Console Logs */}
@@ -417,7 +490,7 @@ export default function Dashboard() {
 
       {/* 7. FOOTER */}
       <footer className="text-center text-[12px] text-[#707070] pt-10 select-none">
-        <p>© Orbit Study OS. Built for Hackathon Performance.</p>
+        <p>© Orbit Study OS. Intelligent Workspace for Computer Science.</p>
       </footer>
 
     </div>

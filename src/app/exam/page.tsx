@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { generateAIResponse } from "@/lib/groq";
 import { addGlobalMemory } from "@/lib/aiMemory";
+import { EclixLogo } from "@/components/EclixLogo";
 
 type Question = {
   id: number;
@@ -228,9 +229,28 @@ export default function ExamHall() {
     <div className="min-h-screen bg-background flex flex-col">
       <header className="border-b border-border bg-card/80 backdrop-blur-md sticky top-0 z-50">
         <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
-            <h1 className="font-bold text-sm sm:text-base">Exam Session Active</h1>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => router.back()}
+              title="Go to Previous Page"
+              className="text-neutral-400 hover:text-white hover:bg-white/10 rounded-xl transition-all"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+
+            <div
+              onClick={() => router.push("/")}
+              className="flex items-center gap-2 cursor-pointer group px-2 py-1 rounded-xl hover:bg-white/5 transition-all"
+              title="Go to Dashboard"
+            >
+              <EclixLogo className="h-5 w-5 text-white transition-transform group-hover:scale-110" />
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-primary" />
+                <h1 className="font-bold text-sm sm:text-base text-white">Exam Session Active</h1>
+              </div>
+            </div>
           </div>
           <div className={`flex items-center gap-2 font-mono text-base sm:text-lg font-bold px-3 sm:px-4 py-1 sm:py-1.5 rounded-full border ${timeLeft < 60 ? "bg-destructive/10 text-destructive border-destructive/30 animate-pulse" : "bg-secondary text-foreground border-border"}`}>
             <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />

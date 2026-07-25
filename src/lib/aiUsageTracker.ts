@@ -20,8 +20,8 @@ export interface AIUsageHistoryEntry {
 
 const USAGE_STATS_KEY = "ai_usage_stats";
 const USAGE_HISTORY_KEY = "ai_usage_history";
-const DAILY_TOKEN_LIMIT = 100000;
-const DAILY_REQUEST_LIMIT = 100; // Simplified limit for hackathon demo
+const DAILY_TOKEN_LIMIT = 500000;
+const DAILY_REQUEST_LIMIT = 500;
 
 // Initialize or get current stats
 export const getAIUsageStats = (): AIUsageStats => {

@@ -12,7 +12,7 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: "Orbit — AI Tutor & Assessments",
-  description: "Dynamic AI Learning & Adaptive Assessments Dashboard built for the Hackathon.",
+  description: "Dynamic AI Learning & Adaptive Assessments Workspace for Computer Science.",
   manifest: "/manifest.json",
 };
 

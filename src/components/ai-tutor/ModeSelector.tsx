@@ -1,6 +1,6 @@
 "use client";
 import { cn } from "@/lib/utils";
-import { MessageSquare, Eye, GitBranch, Calendar, HelpCircle, Video, ChevronDown, Lightbulb, Bug } from "lucide-react";
+import { MessageSquare, Eye, GitBranch, Calendar, HelpCircle, Video, ChevronDown, Lightbulb, Bug, Compass } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -8,7 +8,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-export type TutorMode = "text" | "doubt-solver" | "debugger" | "visualization" | "mindmap" | "studyplan" | "quiz" | "video";
+export type TutorMode = "text" | "doubt-solver" | "debugger" | "deep-research" | "visualization" | "mindmap" | "studyplan" | "quiz" | "video";
 
 interface ModeSelectorProps {
     activeMode: TutorMode;
@@ -17,7 +17,8 @@ interface ModeSelectorProps {
 
 const MODES = [
     { value: "text", label: "Chat", icon: MessageSquare, desc: "Text explanations" },
-    { value: "doubt-solver", label: "Doubt Solver", icon: Lightbulb, desc: "Step-by-step solutions with files" },
+    { value: "deep-research", label: "Deep Research", icon: Compass, desc: "Multi-step in-depth analysis" },
+    { value: "doubt-solver", label: "Doubt Solver", icon: Lightbulb, desc: "Step-by-step doubt resolution" },
     { value: "debugger", label: "Code Debugger", icon: Bug, desc: "Socratic step-by-step debugging" },
     { value: "visualization", label: "Interactive Sim", icon: Eye, desc: "Interactive simulations" },
     { value: "mindmap", label: "Mind Map", icon: GitBranch, desc: "Concept maps" },
@@ -33,7 +34,7 @@ export function ModeSelector({ activeMode, onModeChange }: ModeSelectorProps) {
     return (
         <>
             {/* Desktop View */}
-            <div className="hidden sm:flex items-center gap-1 p-1 bg-foreground/[0.03] border border-border rounded-xl flex-shrink-0">
+            <div className="hidden xl:flex items-center gap-1 p-1 bg-foreground/[0.03] border border-border rounded-xl overflow-x-auto no-scrollbar mask-horizontal">
                 {MODES.map((mode) => {
                     const Icon = mode.icon;
                     return (
@@ -56,7 +57,7 @@ export function ModeSelector({ activeMode, onModeChange }: ModeSelectorProps) {
             </div>
 
             {/* Mobile View */}
-            <div className="sm:hidden flex-shrink-0">
+            <div className="xl:hidden flex-shrink-0">
                 <DropdownMenu>
                     <DropdownMenuTrigger className="flex items-center gap-2 px-3 py-2.5 bg-foreground/[0.03] border border-border rounded-xl hover:bg-foreground/[0.06] transition-colors focus:outline-none">
                         <ActiveIcon className="w-5 h-5 text-neutral-300" />

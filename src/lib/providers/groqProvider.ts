@@ -1,11 +1,11 @@
 "use client";
-import { type AIProvider } from "../aiProvider";
+import { type AIProvider, type ChatMessage } from "../aiProvider";
 
 export const groqProvider: AIProvider = {
     name: "groq",
     displayName: "Groq",
 
-    async generateCompletion(systemPrompt, userPrompt, model, temperature, apiKey) {
+    async generateCompletion(messages, model, temperature, apiKey, signal) {
         const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
             method: "POST",
             headers: {
@@ -14,13 +14,11 @@ export const groqProvider: AIProvider = {
             },
             body: JSON.stringify({
                 model,
-                messages: [
-                    { role: "system", content: systemPrompt },
-                    { role: "user", content: userPrompt },
-                ],
+                messages,
                 temperature,
-                max_tokens: 4096,
+                max_tokens: 8192,
             }),
+            signal,
         });
 
         if (!response.ok) {
@@ -30,14 +28,12 @@ export const groqProvider: AIProvider = {
 
         const data = await response.json();
         const content = data.choices?.[0]?.message?.content || "";
-        const inputTokens = (systemPrompt.length + userPrompt.length) / 4;
-        const outputTokens = data.usage?.completion_tokens || content.length / 4;
-        const totalTokens = data.usage?.total_tokens || Math.round(inputTokens + outputTokens);
+        const totalTokens = data.usage?.total_tokens || Math.round(content.length / 4);
 
         return { content, totalTokens, model };
     },
 
-    async *generateCompletionStream(systemPrompt, userPrompt, model, temperature, apiKey) {
+    async *generateCompletionStream(messages, model, temperature, apiKey, signal) {
         const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
             method: "POST",
             headers: {
@@ -47,14 +43,12 @@ export const groqProvider: AIProvider = {
             },
             body: JSON.stringify({
                 model,
-                messages: [
-                    { role: "system", content: systemPrompt },
-                    { role: "user", content: userPrompt },
-                ],
+                messages,
                 temperature,
-                max_tokens: 4096,
+                max_tokens: 8192,
                 stream: true,
             }),
+            signal,
         });
 
         if (!response.ok) {
@@ -69,7 +63,7 @@ export const groqProvider: AIProvider = {
         const reader = response.body.getReader();
         const decoder = new TextDecoder("utf-8");
         let buffer = "";
-        let totalTokens = Math.round((systemPrompt.length + userPrompt.length) / 4);
+        let totalTokens = 0;
 
         try {
             while (true) {
@@ -114,8 +108,10 @@ export const groqProvider: AIProvider = {
     async testConnection(model, apiKey) {
         try {
             const result = await this.generateCompletion(
-                "You are a test bot.",
-                "Reply with exactly: OK",
+                [
+                    { role: "system", content: "You are a test bot." },
+                    { role: "user", content: "Reply with exactly: OK" },
+                ],
                 model,
                 0,
                 apiKey

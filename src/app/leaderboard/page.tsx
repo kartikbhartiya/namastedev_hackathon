@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
+import { EclixLogo } from "@/components/EclixLogo";
 
 interface LeaderboardEntry {
   id: string;
@@ -77,17 +78,32 @@ export default function LeaderboardPage() {
       <header className="border-b border-white/10 bg-[#090909]/80 py-4 fixed top-0 inset-x-0 z-40 backdrop-blur-md">
         <div className="container mx-auto px-4 md:px-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => router.push("/")} className="text-neutral-400 hover:text-white">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => router.back()}
+              title="Go to Previous Page"
+              className="text-neutral-400 hover:text-white hover:bg-white/10 rounded-xl transition-all"
+            >
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <div>
-              <h1 className="text-base md:text-lg font-extrabold flex items-center gap-2 tracking-tight">
-                <Trophy className="w-5 h-5 text-amber-400" />
-                Global CS Cohort Leaderboard
-              </h1>
-              <p className="text-[10px] md:text-xs text-neutral-400">
-                Top Computer Science Scholars Ranked by Orbit XP & Study Streaks
-              </p>
+
+            {/* Clickable Logo & Brand -> Dashboard */}
+            <div
+              onClick={() => router.push("/")}
+              className="flex items-center gap-2.5 cursor-pointer group px-2 py-1 rounded-xl hover:bg-white/5 transition-all"
+              title="Go to Dashboard"
+            >
+              <EclixLogo className="h-5 w-5 text-white transition-transform group-hover:scale-110" />
+              <div>
+                <h1 className="text-base md:text-lg font-extrabold flex items-center gap-2 tracking-tight text-white">
+                  <Trophy className="w-4 h-4 text-amber-400" />
+                  Global CS Cohort Leaderboard
+                </h1>
+                <p className="text-[10px] md:text-xs text-neutral-400">
+                  Top Computer Science Scholars Ranked by Orbit XP & Study Streaks
+                </p>
+              </div>
             </div>
           </div>
         </div>

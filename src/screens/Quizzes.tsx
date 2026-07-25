@@ -9,6 +9,7 @@ import { generateQuiz, generateFollowUpQuestions, detectWeaknesses, DEFAULT_TUTO
 import { cn } from "@/lib/utils";
 
 // UI Components
+import { EclixLogo } from "@/components/EclixLogo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -704,26 +705,26 @@ export function Quizzes({ initialAction, initialTopic }: QuizzesProps = {}) {
                 </ScrollArea>
               </div>
 
-              {/* Hackathon Support Banner */}
+              {/* Orbit CS Workspace Banner */}
               <div className="mt-6 p-4 rounded-xl border border-white/[0.06] bg-white/[0.01] text-left relative overflow-hidden group">
                 <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:scale-110 transition-transform duration-500">
                   <Heart className="h-20 w-20 fill-white" />
                 </div>
                 <div className="relative z-10">
                   <h4 className="font-bold text-neutral-300 text-xs mb-1 flex items-center gap-1">
-                    Enjoying the Eclix Demo? <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                    Mastering CS with Orbit <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
                   </h4>
                   <p className="text-[11px] text-neutral-500 leading-relaxed mb-3">
-                    Eclix features a complete, zero-setup developer ecosystem. Try generating new topics dynamically or asking AI questions!
+                    Orbit features a complete AI tutor ecosystem. Try generating new topics dynamically or asking AI questions!
                   </p>
                   <Button
                     size="sm"
-                    className="rounded-lg bg-white hover:bg-neutral-200 text-black font-semibold text-xs px-3 h-8"
+                    className="rounded-lg bg-[#ff6c37] hover:bg-[#ff8454] text-white font-semibold text-xs px-3 h-8"
                     onClick={() => {
-                      toast.success("Thank you for reviewing Eclix! Premium donation flow mock successfully unlocked.");
+                      toast.success("Keep up the great study streak with Orbit!");
                     }}
                   >
-                    Unlock Premium Support
+                    Explore Orbit AI Tutor
                   </Button>
                 </div>
               </div>
@@ -745,11 +746,28 @@ export function Quizzes({ initialAction, initialTopic }: QuizzesProps = {}) {
     <div className={cn("min-h-screen transition-all duration-500 pt-14 md:pt-16 bg-[#020617] text-slate-50")}>
       <header className={cn("sticky top-14 md:top-16 z-50 border-b backdrop-blur-md bg-background/40 border-white/5 shadow-sm")}>
         <div className="container mx-auto px-6 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-3 group cursor-pointer" onClick={() => router.push("/")}>
-            <div className={cn("p-2.5 rounded-xl transition-all duration-300 group-hover:rotate-12 bg-white/5 text-white")}>
-              <Brain className="h-5 w-5" />
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => router.back()}
+              title="Go to Previous Page"
+              className="text-neutral-400 hover:text-white hover:bg-white/10 rounded-xl transition-all"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+
+            <div
+              className="flex items-center gap-2.5 group cursor-pointer px-2 py-1 rounded-xl hover:bg-white/5 transition-all"
+              onClick={() => router.push("/")}
+              title="Go to Dashboard"
+            >
+              <EclixLogo className="h-5 w-5 text-white transition-transform group-hover:scale-110" />
+              <div className="flex items-center gap-2">
+                <Brain className="h-4 w-4 text-primary" />
+                <span className="text-lg font-bold tracking-tight text-white">Quizzes</span>
+              </div>
             </div>
-            <span className="text-xl font-bold tracking-tight text-white">Quizzes</span>
           </div>
           <div className="flex items-center gap-3">
             <Button variant="ghost" onClick={() => router.push("/")} className="rounded-xl gap-1.5 hover:bg-white/5 text-neutral-300">

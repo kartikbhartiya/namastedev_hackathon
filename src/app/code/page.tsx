@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { generateAIResponse } from "@/lib/groq";
 import { cn } from "@/lib/utils";
+import { EclixLogo } from "@/components/EclixLogo";
 
 type NodeItem = {
   id: string;
@@ -579,16 +580,33 @@ export default function CodeExecutionMode() {
       
       {/* Header bar */}
       <header className="border-b border-white/5 bg-[#090909] py-4">
-        <div className="container mx-auto px-6 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.push("/")} className="text-neutral-400 hover:text-white">
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <div>
-            <h1 className="text-lg font-bold flex items-center gap-2">
-              <Code2 className="w-5 h-5 text-[#ff6c37]" />
-              Code Execution Tracer
-            </h1>
-            <p className="text-xs text-neutral-500">Trace Stack Frames & Variables.</p>
+        <div className="container mx-auto px-6 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => router.back()}
+              title="Go to Previous Page"
+              className="text-neutral-400 hover:text-white hover:bg-white/10 rounded-xl transition-all"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+
+            {/* Clickable Logo & Brand -> Dashboard */}
+            <div
+              onClick={() => router.push("/")}
+              className="flex items-center gap-2.5 cursor-pointer group px-2 py-1 rounded-xl hover:bg-white/5 transition-all"
+              title="Go to Dashboard"
+            >
+              <EclixLogo className="h-5 w-5 text-white transition-transform group-hover:scale-110" />
+              <div>
+                <h1 className="text-lg font-bold flex items-center gap-2 text-white">
+                  <Code2 className="w-4 h-4 text-[#ff6c37]" />
+                  Code Execution Tracer
+                </h1>
+                <p className="text-xs text-neutral-500">Trace Stack Frames & Variables.</p>
+              </div>
+            </div>
           </div>
         </div>
       </header>

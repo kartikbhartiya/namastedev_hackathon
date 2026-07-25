@@ -6,22 +6,27 @@ import { cn } from "@/lib/utils";
 
 interface StudyHeatmapProps {
   streak?: number;
+  activityLevels?: number[]; // Array of 364 activity levels (0-3) for the last 364 days
 }
 
-export function StudyHeatmap({ streak = 5 }: StudyHeatmapProps) {
-  // Generate 28 days (4 weeks x 7 days) of activity mock data with high activity on recent days
+export function StudyHeatmap({ streak = 0, activityLevels }: StudyHeatmapProps) {
+  // Use real data if provided, otherwise fallback to empty/mock data
   const days = useMemo(() => {
+    if (activityLevels && activityLevels.length === 364) {
+      return activityLevels.map((level, i) => ({ day: i + 1, level }));
+    }
+    
+    // Fallback if no data provided
     const result = [];
-    const totalDays = 28;
+    const totalDays = 364;
     for (let i = 0; i < totalDays; i++) {
-      // Simulate higher activity on recent days matching streak
-      const isStreakDay = i >= totalDays - streak;
-      const randomActivity = Math.floor(Math.random() * 4); // 0 = none, 1 = low, 2 = med, 3 = high
-      const level = isStreakDay ? Math.max(1, randomActivity) : Math.random() > 0.4 ? randomActivity : 0;
+      // Simulate higher activity on recent days matching streak, or just 0 if no streak
+      const isStreakDay = streak > 0 && i >= totalDays - streak;
+      const level = isStreakDay ? 1 : 0;
       result.push({ day: i + 1, level });
     }
     return result;
-  }, [streak]);
+  }, [streak, activityLevels]);
 
   const levelColors = [
     "bg-neutral-900 border-white/5", // 0: None
@@ -31,7 +36,7 @@ export function StudyHeatmap({ streak = 5 }: StudyHeatmapProps) {
   ];
 
   return (
-    <div className="p-6 rounded-xl bg-[#0b0b0b] border border-white/5 flex flex-col justify-between space-y-4 select-none">
+    <div className="p-4 sm:p-5 rounded-xl bg-[#0b0b0b] border border-white/5 flex flex-col justify-between space-y-3 select-none">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Flame className="w-4 h-4 text-[#ff6c37]" />
@@ -44,25 +49,32 @@ export function StudyHeatmap({ streak = 5 }: StudyHeatmapProps) {
         </span>
       </div>
 
-      {/* Heatmap Grid */}
-      <div className="grid grid-cols-7 gap-2 pt-1">
-        {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
-          <span key={i} className="text-[9px] font-bold text-neutral-600 text-center uppercase">
-            {d}
-          </span>
-        ))}
-        {days.map((item, idx) => (
-          <div
-            key={idx}
-            title={`Day ${item.day}: Activity Level ${item.level}`}
-            className={cn(
-              "h-7 rounded-md border flex items-center justify-center text-[9px] font-bold transition-all hover:scale-110 cursor-pointer",
-              levelColors[item.level]
-            )}
-          >
-            {item.level > 0 && "•"}
-          </div>
-        ))}
+      {/* Heatmap Grid (Leetcode style, side scrolling if needed) */}
+      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 pt-1" style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
+        {/* Days of week Y-axis labels */}
+        <div className="grid grid-rows-7 gap-1.5 text-[9px] font-bold text-neutral-600 uppercase pr-2 sticky left-0 bg-[#0b0b0b] z-10">
+          <span className="h-3 flex items-center">M</span>
+          <span className="h-3 flex items-center"></span>
+          <span className="h-3 flex items-center">W</span>
+          <span className="h-3 flex items-center"></span>
+          <span className="h-3 flex items-center">F</span>
+          <span className="h-3 flex items-center"></span>
+          <span className="h-3 flex items-center">S</span>
+        </div>
+        
+        {/* Activity Cells */}
+        <div className="grid grid-rows-7 grid-flow-col gap-1.5">
+          {days.map((item, idx) => (
+            <div
+              key={idx}
+              title={`Day ${item.day}: Activity Level ${item.level}`}
+              className={cn(
+                "w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-[3px] border transition-all hover:scale-125 cursor-pointer flex-shrink-0",
+                levelColors[item.level]
+              )}
+            />
+          ))}
+        </div>
       </div>
 
       {/* Legend */}

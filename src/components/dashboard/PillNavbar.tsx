@@ -38,9 +38,10 @@ interface PillNavbarProps {
   variant: "student" | "mentor";
   avatarUrl?: string | null;
   avatarFallback?: string;
+  isAuthenticated?: boolean;
 }
 
-export function PillNavbar({ avatarUrl, avatarFallback }: PillNavbarProps) {
+export function PillNavbar({ avatarUrl, avatarFallback, isAuthenticated }: PillNavbarProps) {
   const router = useRouter();
   const pathname = usePathname();
 
@@ -67,7 +68,7 @@ export function PillNavbar({ avatarUrl, avatarFallback }: PillNavbarProps) {
 
         {/* Middle Navigation Group - Scrollbar strictly hidden */}
         <div 
-          className="flex items-center gap-1 md:gap-1.5 overflow-x-auto no-scrollbar py-0.5"
+          className="flex items-center gap-1 md:gap-1.5 overflow-x-auto overflow-y-hidden no-scrollbar py-1.5 px-2 -mx-2"
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
           {NAV_ITEMS.map((item) => {
@@ -86,11 +87,6 @@ export function PillNavbar({ avatarUrl, avatarFallback }: PillNavbarProps) {
                 )}
               >
                 <Icon className={cn("h-4 w-4 md:h-4 md:w-4 transition-transform duration-200", isActive && "text-[#ff6c37]")} />
-                
-                {/* Active Indicator underneath */}
-                {isActive && (
-                  <span className="absolute -bottom-1 w-1 h-1 rounded-full bg-[#ff6c37] shadow-[0_0_8px_#ff6c37]" />
-                )}
 
                 {/* Tooltip Label */}
                 <span className="hidden md:block absolute bottom-[-42px] left-1/2 -translate-x-1/2 bg-neutral-950/95 border border-white/10 text-[10px] font-bold text-white px-2.5 py-1 rounded-md opacity-0 translate-y-1 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 whitespace-nowrap shadow-2xl tracking-wider backdrop-blur-md">
@@ -104,21 +100,32 @@ export function PillNavbar({ avatarUrl, avatarFallback }: PillNavbarProps) {
         {/* Divider */}
         <div className="w-[1px] h-4 md:h-5 bg-white/10 shrink-0" />
 
-        {/* Profile Avatar */}
+        {/* Profile Avatar or Login */}
         <div className="relative group shrink-0">
-          <Avatar
-            onClick={() => router.push("/profile")}
-            className="cursor-pointer h-7 w-7 md:h-8 md:w-8 border border-white/15 hover:border-[#ff6c37]/50 transition-all hover:scale-105 shadow-md"
-          >
-            <AvatarImage src={avatarUrl || ""} className="object-cover" referrerPolicy="no-referrer" />
-            <AvatarFallback className="bg-neutral-950 text-white font-bold text-xs">
-              {avatarFallback}
-            </AvatarFallback>
-          </Avatar>
-          
-          <span className="hidden md:block absolute bottom-[-42px] left-1/2 -translate-x-1/2 bg-neutral-950/95 border border-white/10 text-[10px] font-bold text-white px-2.5 py-1 rounded-md opacity-0 translate-y-1 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 whitespace-nowrap shadow-2xl tracking-wider backdrop-blur-md">
-            SETTINGS
-          </span>
+          {isAuthenticated ? (
+            <>
+              <Avatar
+                onClick={() => router.push("/profile")}
+                className="cursor-pointer h-7 w-7 md:h-8 md:w-8 border border-white/15 hover:border-[#ff6c37]/50 transition-all hover:scale-105 shadow-md"
+              >
+                <AvatarImage src={avatarUrl || ""} className="object-cover" referrerPolicy="no-referrer" />
+                <AvatarFallback className="bg-neutral-950 text-white font-bold text-xs">
+                  {avatarFallback}
+                </AvatarFallback>
+              </Avatar>
+              
+              <span className="hidden md:block absolute bottom-[-42px] left-1/2 -translate-x-1/2 bg-neutral-950/95 border border-white/10 text-[10px] font-bold text-white px-2.5 py-1 rounded-md opacity-0 translate-y-1 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 whitespace-nowrap shadow-2xl tracking-wider backdrop-blur-md">
+                PROFILE
+              </span>
+            </>
+          ) : (
+            <button 
+              onClick={() => router.push("/auth")}
+              className="h-7 md:h-8 px-3 md:px-4 rounded-full bg-white text-black font-semibold text-[11px] md:text-xs hover:bg-neutral-200 transition-colors"
+            >
+              Sign In
+            </button>
+          )}
         </div>
 
       </div>

@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Auth from "@/screens/Auth";
 
 export const metadata: Metadata = {
-  title: "Sign In",
-  description: "Sign in or create your free Eclix account to start studying smarter.",
+  title: "Sign In — Orbit",
+  description: "Sign in or create your Orbit account to access AI tutoring, proctored exams, and more.",
 };
 
 export default function Page() {

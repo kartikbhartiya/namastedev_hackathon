@@ -6,6 +6,11 @@ import { supabase } from "./supabase";
 
 // ——— Types ———
 
+export interface ChatMessage {
+    role: "system" | "user" | "assistant";
+    content: string;
+}
+
 export interface AIProviderConfig {
     apiKey: string;
     model: string;
@@ -21,21 +26,20 @@ export interface AIProvider {
     name: string;
     displayName: string;
     generateCompletion(
-        systemPrompt: string,
-        userPrompt: string,
+        messages: ChatMessage[],
         model: string,
         temperature: number,
-        apiKey: string
+        apiKey: string,
+        signal?: AbortSignal
     ): Promise<{ content: string; totalTokens: number; model: string }>;
 
-    // Non-blocking streaming request
     generateCompletionStream?(
-        systemPrompt: string,
-        userPrompt: string,
+        messages: ChatMessage[],
         model: string,
         temperature: number,
-        apiKey: string
-    ): AsyncGenerator<string, { totalTokens: number, model: string }, unknown>;
+        apiKey: string,
+        signal?: AbortSignal
+    ): AsyncGenerator<string, { totalTokens: number; model: string }, unknown>;
     testConnection(model: string, apiKey: string): Promise<boolean>;
     getModels(): { value: string; label: string }[];
 }

@@ -10,6 +10,8 @@ import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
 import { addGlobalMemory } from "@/lib/aiMemory";
 
+import { EclixLogo } from "@/components/EclixLogo";
+
 type ConceptNode = {
   name: string;
   description: string;
@@ -123,16 +125,39 @@ export default function ConceptGraph() {
       
       {/* Header */}
       <header className="border-b border-white/5 bg-[#090909] py-4 z-50">
-        <div className="container mx-auto px-6 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.push("/")} className="text-neutral-400 hover:text-white">
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <div>
-            <h1 className="text-lg font-bold flex items-center gap-2">
-              <Network className="w-5 h-5 text-[#ff6c37]" />
-              AI Concept Graph
-            </h1>
-            <p className="text-xs text-neutral-500">Break down courses into dynamic learning pathways.</p>
+        <div className="container mx-auto px-6 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                if (typeof window !== "undefined" && window.history.length > 1) {
+                  router.back();
+                } else {
+                  router.push("/");
+                }
+              }}
+              title="Go to Previous Page"
+              className="text-neutral-400 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+
+            {/* Clickable Logo & Brand -> Dashboard */}
+            <div
+              onClick={() => router.push("/")}
+              className="flex items-center gap-2.5 cursor-pointer group px-2 py-1 rounded-xl hover:bg-white/5 transition-all"
+              title="Go to Dashboard"
+            >
+              <EclixLogo className="h-5 w-5 text-white transition-transform group-hover:scale-110" />
+              <div>
+                <h1 className="text-sm font-bold flex items-center gap-1.5 text-white">
+                  <Network className="w-4 h-4 text-[#ff6c37]" />
+                  AI Concept Graph
+                </h1>
+                <p className="text-[10px] text-neutral-500">Break down courses into dynamic learning pathways.</p>
+              </div>
+            </div>
           </div>
         </div>
       </header>

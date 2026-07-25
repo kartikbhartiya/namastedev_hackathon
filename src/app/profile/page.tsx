@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Loader2, User, Key, LogOut, Award, Save, RefreshCw, Check, Sparkles, BookOpen, GraduationCap } from "lucide-react";
+import { Loader2, User, Key, LogOut, Award, Save, RefreshCw, Check, Sparkles, BookOpen, GraduationCap, ArrowLeft } from "lucide-react";
+import { EclixLogo } from "@/components/EclixLogo";
 
 export default function ProfileSettingsPage() {
   const { user, profile, updateProfile, updatePassword, logout, loading } = useAuth();
@@ -21,6 +22,12 @@ export default function ProfileSettingsPage() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [updatingPass, setUpdatingPass] = useState(false);
   const [activeTab, setActiveTab] = useState<"details" | "security" | "badges">("details");
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace("/auth");
+    }
+  }, [user, loading, router]);
 
   useEffect(() => {
     if (profile) {
@@ -87,16 +94,30 @@ export default function ProfileSettingsPage() {
     <div className="max-w-4xl mx-auto space-y-8 pt-28 md:pt-32 px-4 sm:px-6 pb-20 select-none">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-6">
-        <div>
-          <span className="text-[11px] font-bold uppercase tracking-widest text-primary mb-1 block">
-            Orbit Scholar Workspace
-          </span>
-          <h1 className="text-3xl font-extrabold tracking-tight text-white">
-            Account & Profile Settings
-          </h1>
-          <p className="text-neutral-400 text-sm mt-1">
-            Manage your personal student details, learning preferences, and security.
-          </p>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => router.back()}
+            title="Go to Previous Page"
+            className="p-2 rounded-xl text-neutral-400 hover:text-white hover:bg-white/10 transition-all focus:outline-none"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+
+          <div
+            onClick={() => router.push("/")}
+            className="flex items-center gap-3 cursor-pointer group px-2 py-1 rounded-xl hover:bg-white/5 transition-all"
+            title="Go to Dashboard"
+          >
+            <EclixLogo className="h-6 w-6 text-white transition-transform group-hover:scale-110" />
+            <div>
+              <span className="text-[11px] font-bold uppercase tracking-widest text-primary mb-0.5 block">
+                Orbit Scholar Workspace
+              </span>
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+                Account & Profile Settings
+              </h1>
+            </div>
+          </div>
         </div>
 
         {!user ? (
@@ -141,8 +162,8 @@ export default function ProfileSettingsPage() {
               </span>
             </div>
 
-            <p className="text-neutral-400 text-sm">
-              {user?.email || "No email linked (Demo Mode)"}
+            <p className="text-neutral-400 text-sm font-medium">
+              {user?.email || "Not signed in"}
             </p>
 
             <div className="flex flex-wrap items-center gap-4 pt-2 text-xs text-neutral-300">
