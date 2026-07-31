@@ -436,6 +436,17 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* SIH TOOLS */}
+        <div className="space-y-4">
+          <SectionHeader label="SIH TOOLS" title="Smart India Hackathon 2026" description="AI-powered tools to help you prepare and submit winning SIH presentations." />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <EditorialCard
+              item={{ label: "SIH PPT Maker", icon: Sparkles, href: "/sih-ppt", description: "AI generates a professional SIH presentation from your idea — matching the official template.", estTime: "5 mins", difficulty: "easy", badge: "HOT" }}
+              onClick={() => router.push("/sih-ppt")}
+            />
+          </div>
+        </div>
+
       </section>
 
       {/* 6. TIMELINE ACTIVITY */}
