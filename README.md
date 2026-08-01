@@ -7,7 +7,7 @@
   <img src="https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white" />
 </p>
 
-<h1 align="center">🪐 Orbit Study OS</h1>
+<h1 align="center">🪐 Orbit Study MOS</h1>
 
 <p align="center">
   <strong>An AI-powered, desktop-class operating workspace for computer science students</strong>
